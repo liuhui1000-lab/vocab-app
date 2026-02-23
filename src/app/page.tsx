@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { shuffleArray, playWord, calculateNextReview, formatDate } from '@/lib/vocab-utils';
 import type { Semester, VocabWord, UserProgress, WordWithProgress, SessionWord } from '@/lib/types';
 
@@ -85,7 +85,9 @@ export default function VocabApp() {
   // Learning session state
   const [currentView, setCurrentView] = useState<'setup' | 'study' | 'finish' | 'stats' | 'list' | 'hard'>('setup');
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
+  const sessionWordsRef = useRef<SessionWord[]>([]);  // 用于在闭包中获取最新值
   const [queue, setQueue] = useState<SessionWord[]>([]);
+  const queueRef = useRef<SessionWord[]>([]);  // 用于在闭包中获取最新值
   const [currentWord, setCurrentWord] = useState<SessionWord | null>(null);
   const [mode, setMode] = useState<'learn' | 'quiz' | 'spell'>('learn');
   const [options, setOptions] = useState<string[]>([]);
@@ -94,6 +96,15 @@ export default function VocabApp() {
   const [dailyLimit, setDailyLimit] = useState(20);
   const [unsavedCount, setUnsavedCount] = useState(0);
   const [spellResult, setSpellResult] = useState<{ correct: boolean; needMore?: number; completed?: boolean } | null>(null);
+
+  // 同步 ref
+  useEffect(() => {
+    sessionWordsRef.current = sessionWords;
+  }, [sessionWords]);
+  
+  useEffect(() => {
+    queueRef.current = queue;
+  }, [queue]);
 
   // 初始化 - 检查本地存储的用户名
   useEffect(() => {
@@ -301,10 +312,13 @@ export default function VocabApp() {
       isNewThisSession: !w.progress || w.progress.state === 'new',
     }));
 
+    const initialQueue = session.slice(0, 30);
     setSessionWords(session);
-    setQueue(session.slice(0, 30));
+    sessionWordsRef.current = session;  // 同步更新 ref
+    setQueue(initialQueue);
+    queueRef.current = initialQueue;  // 同步更新 ref
     setCurrentView('study');
-    nextCard(session, session.slice(0, 30));
+    nextCard(session, initialQueue);
   };
 
   // Next card logic - 完全沿用HTML逻辑
@@ -326,6 +340,7 @@ export default function VocabApp() {
       }
       const newQueue = remaining.slice(0, 30);
       setQueue(newQueue);
+      queueRef.current = newQueue;  // 同步更新 ref
       nextCard(currentSessionWords, newQueue);
       return;
     }
@@ -386,6 +401,7 @@ export default function VocabApp() {
       w.id === currentWord.id ? { ...w, tempStep: 1 } : w
     );
     setSessionWords(updatedSessionWords);
+    sessionWordsRef.current = updatedSessionWords;  // 同步更新 ref
     nextCard(updatedSessionWords, queue);
   };
 
@@ -403,6 +419,7 @@ export default function VocabApp() {
         w.id === currentWord.id ? { ...w, tempStep: 1.5 } : w
       );
       setSessionWords(updated);
+      sessionWordsRef.current = updated;  // 同步更新 ref
       setCurrentWord({ ...currentWord, tempStep: 1.5 });
       // HTML: waiting = true，等待点击"下一题"
     } else {
@@ -417,13 +434,20 @@ export default function VocabApp() {
         } : w
       );
       setSessionWords(updated);
+      sessionWordsRef.current = updated;  // 同步更新 ref
       setCurrentWord({ ...currentWord, tempStep: 0, inPenalty: true, penaltyProgress: 0 });
       await updateWordState(currentWord, false);
     }
   };
 
   // 默写检查 - 完全沿用HTML的checkSpelling逻辑
-  const handleSpellSubmit = async (input: string) => {
+  // 返回更新后的 sessionWords 供 handleNext 使用
+  const handleSpellSubmit = async (input: string): Promise<{ 
+    correct: boolean; 
+    needMore?: number; 
+    completed?: boolean;
+    updatedSessionWords?: SessionWord[];
+  }> => {
     if (!currentWord || spellResult?.correct) return { correct: false };
     
     const isCorrect = input.trim().toLowerCase() === currentWord.word.toLowerCase();
@@ -447,11 +471,12 @@ export default function VocabApp() {
             } : w
           );
           setSessionWords(updated);
+          sessionWordsRef.current = updated;  // 同步更新 ref
           setCurrentWord({ ...currentWord, tempStep: 2, inPenalty: false, penaltyProgress: 0 });
           setSpellResult({ correct: true, completed: true });
           await updateWordState(currentWord, true);
           await recordStat(username, currentWord.semester_id, 'review');
-          return { correct: true, completed: true };
+          return { correct: true, completed: true, updatedSessionWords: updated };
         } else {
           // HTML: document.getElementById('next-btn').textContent = `正确！还需 ${3 - this.currentCard.penaltyProgress} 次巩固 →`;
           //       this.unsavedChanges++;
@@ -459,10 +484,11 @@ export default function VocabApp() {
             w.id === currentWord.id ? { ...w, penaltyProgress: newPenaltyProgress } : w
           );
           setSessionWords(updated);
+          sessionWordsRef.current = updated;  // 同步更新 ref
           setCurrentWord({ ...currentWord, penaltyProgress: newPenaltyProgress });
           setSpellResult({ correct: true, needMore: 3 - newPenaltyProgress });
           // 不更新进度，继续下一个单词
-          return { correct: true, needMore: 3 - newPenaltyProgress };
+          return { correct: true, needMore: 3 - newPenaltyProgress, updatedSessionWords: updated };
         }
       } else {
         // 正常模式：默写正确，完成！
@@ -471,11 +497,12 @@ export default function VocabApp() {
           w.id === currentWord.id ? { ...w, tempStep: 2 } : w
         );
         setSessionWords(updated);
+        sessionWordsRef.current = updated;  // 同步更新 ref
         setCurrentWord({ ...currentWord, tempStep: 2 });
         setSpellResult({ correct: true, completed: true });
         await updateWordState(currentWord, true);
         await recordStat(username, currentWord.semester_id, currentWord.isNewThisSession ? 'new' : 'review');
-        return { correct: true, completed: true };
+        return { correct: true, completed: true, updatedSessionWords: updated };
       }
     } else {
       // 默写错误：进入惩罚模式
@@ -490,10 +517,11 @@ export default function VocabApp() {
         } : w
       );
       setSessionWords(updated);
+      sessionWordsRef.current = updated;  // 同步更新 ref
       setCurrentWord({ ...currentWord, tempStep: 0, inPenalty: true, penaltyProgress: 0 });
       setSpellResult({ correct: false });
       await updateWordState(currentWord, false);
-      return { correct: false };
+      return { correct: false, updatedSessionWords: updated };
     }
   };
 
@@ -521,15 +549,19 @@ export default function VocabApp() {
     setUnsavedCount(c => c + 1);
     
     // 更新本地 sessionWords 中的 progress.state，确保 nextCard 能正确判断
-    setSessionWords(prev => prev.map(w => {
-      if (w.id === word.id) {
-        return {
-          ...w,
-          progress: w.progress ? { ...w.progress, state: newState } : undefined,
-        };
-      }
-      return w;
-    }));
+    setSessionWords(prev => {
+      const updated = prev.map(w => {
+        if (w.id === word.id) {
+          return {
+            ...w,
+            progress: w.progress ? { ...w.progress, state: newState } : undefined,
+          };
+        }
+        return w;
+      });
+      sessionWordsRef.current = updated;  // 同步更新 ref
+      return updated;
+    });
     
     if (unsavedCount >= 4) {
       await saveProgress(username, [progressUpdate]);
@@ -569,6 +601,10 @@ export default function VocabApp() {
 
   // handleNext - 完全沿用HTML逻辑
   const handleNext = () => {
+    // 使用 ref 获取最新值
+    const currentSessionWords = sessionWordsRef.current;
+    const currentQueue = queueRef.current;
+    
     // HTML: if (this.currentMode === 'learn') { this.currentCard.tempStep = 1; this.nextCard(); }
     if (mode === 'learn') {
       handleLearnNext();
@@ -578,14 +614,14 @@ export default function VocabApp() {
       // waiting 表示已完成默写结果的处理（正确或错误都算waiting）
       if (spellResult) {
         // 已处理完，进入下一题
-        nextCard(sessionWords, queue);
+        nextCard(currentSessionWords, currentQueue);
       }
       // 否则不处理，由 onKeyDown 触发 checkSpelling
     }
     // HTML: else if (this.waiting) { this.nextCard(); }
     else if (mode === 'quiz' && showAnswer) {
       // 选择题已作答，进入下一题
-      nextCard(sessionWords, queue);
+      nextCard(currentSessionWords, currentQueue);
     }
   };
 
