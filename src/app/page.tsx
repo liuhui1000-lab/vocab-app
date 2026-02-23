@@ -141,20 +141,30 @@ export default function VocabApp() {
     localStorage.setItem('vocab_selected_semesters', JSON.stringify(selectedSemesterIds));
   }, [selectedSemesterIds]);
 
-  // Get dashboard stats
+  // Get dashboard stats - 基于选中分类聚合显示
   const getStats = useCallback(() => {
     const now = new Date();
+    const total = allWords.length;
+    
+    // 待学习数（新词）- 没有进度记录或状态为new
+    const newCount = allWords.filter(w => 
+      !w.progress || w.progress.state === 'new'
+    ).length;
+    
+    // 待复习数 - 已学习但到了复习时间
     const reviewCount = allWords.filter(w => 
       w.progress && 
       w.progress.state !== 'new' && 
       w.progress.next_review && 
       new Date(w.progress.next_review) <= now
     ).length;
-    const total = allWords.length;
-    const learned = allWords.filter(w => w.progress && w.progress.state !== 'new').length;
-    const hardCount = allWords.filter(w => w.progress && w.progress.failure_count > 3).length;
     
-    return { reviewCount, total, learned, hardCount };
+    // 困难单词数 - 错误次数超过3次
+    const hardCount = allWords.filter(w => 
+      w.progress && w.progress.failure_count > 3
+    ).length;
+    
+    return { total, newCount, reviewCount, hardCount };
   }, [allWords]);
 
   const stats = getStats();
@@ -477,21 +487,21 @@ export default function VocabApp() {
             <p className="text-gray-500 mt-2">选择学期 · 智能复习</p>
           </div>
 
-          {/* Dashboard */}
+          {/* Dashboard - 显示选中分类的聚合统计 */}
           {selectedSemesterIds.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
               <div className="grid grid-cols-4 gap-2 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-blue-500">{stats.reviewCount}</div>
-                  <div className="text-xs text-gray-500">⏰ 待复习</div>
-                </div>
                 <div>
                   <div className="text-2xl font-bold">{stats.total}</div>
                   <div className="text-xs text-gray-500">📚 总量</div>
                 </div>
                 <div>
-                  <div className="text-2xl font-bold text-green-500">{stats.learned}</div>
-                  <div className="text-xs text-gray-500">✅ 已背</div>
+                  <div className="text-2xl font-bold text-blue-500">{stats.newCount}</div>
+                  <div className="text-xs text-gray-500">📖 待学习</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-orange-500">{stats.reviewCount}</div>
+                  <div className="text-xs text-gray-500">⏰ 待复习</div>
                 </div>
                 <div>
                   <div className="text-2xl font-bold text-red-500">{stats.hardCount}</div>
