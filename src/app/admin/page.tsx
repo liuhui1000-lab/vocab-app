@@ -18,21 +18,33 @@ interface Semester {
 }
 
 export default function AdminPage() {
-  const [currentUser, setCurrentUser] = useState<{ username: string; isAdmin: boolean } | null>(null);
+  const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean } | null>(null);
   const [inputUsername, setInputUsername] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'vocab' | 'users'>('vocab');
+  const [activeTab, setActiveTab] = useState<'vocab' | 'users' | 'profile'>('vocab');
   const [users, setUsers] = useState<User[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
   const [vocabJson, setVocabJson] = useState('');
   const [clearExisting, setClearExisting] = useState(false);
   
+  // 编辑用户
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUsername, setEditUsername] = useState('');
+  const [editPassword, setEditPassword] = useState('');
+  
+  // 创建新用户
+  const [showCreateUser, setShowCreateUser] = useState(false);
   const [newUsername, setNewUsername] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [newIsAdmin, setNewIsAdmin] = useState(false);
+  
+  // 修改当前管理员密码
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [loading, setLoading] = useState(false);
@@ -57,26 +69,37 @@ export default function AdminPage() {
   }, [currentUser]);
 
   const loadUsers = async () => {
-    const res = await fetch(`/api/user?action=list&admin=${encodeURIComponent(currentUser!.username)}`);
-    const data = await res.json();
-    if (data.users) {
-      setUsers(data.users);
+    try {
+      const res = await fetch(`/api/user?action=list&admin=${encodeURIComponent(currentUser!.username)}`);
+      const data = await res.json();
+      if (data.users) {
+        setUsers(data.users);
+      }
+    } catch (e) {
+      showMessage('error', '加载用户列表失败');
     }
   };
 
   const loadSemesters = async () => {
-    const res = await fetch('/api/semesters');
-    const data = await res.json();
-    if (data.semesters) {
-      // 获取每个分类的单词数量
-      const semestersWithCount = await Promise.all(
-        data.semesters.map(async (s: Semester) => {
-          const vocabRes = await fetch(`/api/vocab/${s.id}`);
-          const vocabData = await vocabRes.json();
-          return { ...s, wordCount: vocabData.words?.length || 0 };
-        })
-      );
-      setSemesters(semestersWithCount);
+    try {
+      const res = await fetch('/api/semesters');
+      const data = await res.json();
+      if (data.semesters) {
+        const semestersWithCount = await Promise.all(
+          data.semesters.map(async (s: Semester) => {
+            try {
+              const vocabRes = await fetch(`/api/vocab/${s.id}`);
+              const vocabData = await vocabRes.json();
+              return { ...s, wordCount: vocabData.words?.length || 0 };
+            } catch {
+              return { ...s, wordCount: 0 };
+            }
+          })
+        );
+        setSemesters(semestersWithCount);
+      }
+    } catch (e) {
+      showMessage('error', '加载分类失败');
     }
   };
 
@@ -89,25 +112,29 @@ export default function AdminPage() {
     setLoading(true);
     setLoginError('');
 
-    const res = await fetch('/api/user', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
-        username: inputUsername.trim(), 
-        password: inputPassword,
-        action: 'login'
-      }),
-    });
+    try {
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          username: inputUsername.trim(), 
+          password: inputPassword,
+          action: 'login'
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success && data.user.isAdmin) {
-      setCurrentUser(data.user);
-      localStorage.setItem('vocab_admin_user', JSON.stringify(data.user));
-    } else if (data.success && !data.user.isAdmin) {
-      setLoginError('您不是管理员，无法访问此页面');
-    } else {
-      setLoginError(data.error || '登录失败');
+      if (data.success && data.user.isAdmin) {
+        setCurrentUser(data.user);
+        localStorage.setItem('vocab_admin_user', JSON.stringify(data.user));
+      } else if (data.success && !data.user.isAdmin) {
+        setLoginError('您不是管理员，无法访问此页面');
+      } else {
+        setLoginError(data.error || '登录失败');
+      }
+    } catch (e) {
+      setLoginError('网络错误');
     }
 
     setLoading(false);
@@ -120,10 +147,10 @@ export default function AdminPage() {
 
   const showMessage = (type: 'success' | 'error', text: string) => {
     setMessage({ type, text });
-    setTimeout(() => setMessage(null), 3000);
+    setTimeout(() => setMessage(null), 4000);
   };
 
-  // 导入单词
+  // ==================== 单词导入 ====================
   const handleImportVocab = async () => {
     if (!selectedSemester) {
       showMessage('error', '请选择分类');
@@ -134,31 +161,82 @@ export default function AdminPage() {
     try {
       words = JSON.parse(vocabJson);
     } catch {
-      showMessage('error', 'JSON格式错误');
+      showMessage('error', 'JSON格式错误，请检查格式');
+      return;
+    }
+
+    if (!Array.isArray(words) || words.length === 0) {
+      showMessage('error', '请输入有效的单词数组');
       return;
     }
 
     setLoading(true);
 
-    const res = await fetch('/api/admin/vocab', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adminUsername: currentUser!.username,
-        semesterId: selectedSemester,
-        words,
-        clearExisting
-      }),
-    });
+    try {
+      const res = await fetch('/api/admin/vocab', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUsername: currentUser!.username,
+          semesterId: selectedSemester,
+          words,
+          clearExisting
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      showMessage('success', `成功导入 ${data.imported} 个单词到 ${data.semester}`);
-      setVocabJson('');
-      loadSemesters();
-    } else {
-      showMessage('error', data.error || '导入失败');
+      if (data.success) {
+        showMessage('success', `成功导入 ${data.imported} 个单词到 ${data.semester}`);
+        setVocabJson('');
+        loadSemesters();
+      } else {
+        showMessage('error', data.error || '导入失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
+    }
+
+    setLoading(false);
+  };
+
+  // ==================== 用户管理 ====================
+  
+  // 创建新用户
+  const handleCreateUser = async () => {
+    if (!newUsername.trim()) {
+      showMessage('error', '请输入用户名');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: newUsername.trim(),
+          password: newPassword || undefined,
+          isAdmin: newIsAdmin,
+          createdByAdmin: currentUser!.username
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showMessage('success', `用户 "${newUsername}" 创建成功`);
+        setNewUsername('');
+        setNewPassword('');
+        setNewIsAdmin(false);
+        setShowCreateUser(false);
+        loadUsers();
+      } else {
+        showMessage('error', data.error || '创建失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
     }
 
     setLoading(false);
@@ -170,27 +248,31 @@ export default function AdminPage() {
 
     setLoading(true);
 
-    const res = await fetch('/api/user', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        adminUsername: currentUser!.username,
-        targetUserId: editingUser.id,
-        newUsername: newUsername || undefined,
-        newPassword: newPassword || undefined
-      }),
-    });
+    try {
+      const res = await fetch('/api/user', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUsername: currentUser!.username,
+          targetUserId: editingUser.id,
+          newUsername: editUsername || undefined,
+          newPassword: editPassword || undefined
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      showMessage('success', '用户信息已更新');
-      setEditingUser(null);
-      setNewUsername('');
-      setNewPassword('');
-      loadUsers();
-    } else {
-      showMessage('error', data.error || '更新失败');
+      if (data.success) {
+        showMessage('success', '用户信息已更新');
+        setEditingUser(null);
+        setEditUsername('');
+        setEditPassword('');
+        loadUsers();
+      } else {
+        showMessage('error', data.error || '更新失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
     }
 
     setLoading(false);
@@ -200,17 +282,21 @@ export default function AdminPage() {
   const handleDeleteUser = async (userId: number, username: string) => {
     if (!confirm(`确定删除用户 "${username}"？此操作不可恢复！`)) return;
 
-    const res = await fetch(`/api/user?adminUsername=${encodeURIComponent(currentUser!.username)}&userId=${userId}`, {
-      method: 'DELETE',
-    });
+    try {
+      const res = await fetch(`/api/user?adminUsername=${encodeURIComponent(currentUser!.username)}&userId=${userId}`, {
+        method: 'DELETE',
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      showMessage('success', '用户已删除');
-      loadUsers();
-    } else {
-      showMessage('error', data.error || '删除失败');
+      if (data.success) {
+        showMessage('success', '用户已删除');
+        loadUsers();
+      } else {
+        showMessage('error', data.error || '删除失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
     }
   };
 
@@ -218,21 +304,74 @@ export default function AdminPage() {
   const handleDeleteVocab = async (semesterId: number, semesterName: string) => {
     if (!confirm(`确定删除 "${semesterName}" 的所有单词？此操作不可恢复！`)) return;
 
-    const res = await fetch(`/api/admin/vocab?adminUsername=${encodeURIComponent(currentUser!.username)}&semesterId=${semesterId}`, {
-      method: 'DELETE',
-    });
+    try {
+      const res = await fetch(`/api/admin/vocab?adminUsername=${encodeURIComponent(currentUser!.username)}&semesterId=${semesterId}`, {
+        method: 'DELETE',
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (data.success) {
-      showMessage('success', '单词已删除');
-      loadSemesters();
-    } else {
-      showMessage('error', data.error || '删除失败');
+      if (data.success) {
+        showMessage('success', '单词已删除');
+        loadSemesters();
+      } else {
+        showMessage('error', data.error || '删除失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
     }
   };
 
-  // 登录页面
+  // ==================== 管理员修改密码 ====================
+  const handleChangePassword = async () => {
+    if (!currentPassword) {
+      showMessage('error', '请输入当前密码');
+      return;
+    }
+    if (!newAdminPassword) {
+      showMessage('error', '请输入新密码');
+      return;
+    }
+    if (newAdminPassword !== confirmPassword) {
+      showMessage('error', '两次输入的密码不一致');
+      return;
+    }
+    if (newAdminPassword.length < 4) {
+      showMessage('error', '新密码至少需要4个字符');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/user/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          username: currentUser!.username,
+          currentPassword,
+          newPassword: newAdminPassword
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showMessage('success', '密码修改成功');
+        setCurrentPassword('');
+        setNewAdminPassword('');
+        setConfirmPassword('');
+      } else {
+        showMessage('error', data.error || '修改失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
+    }
+
+    setLoading(false);
+  };
+
+  // ==================== 登录页面 ====================
   if (!currentUser) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -278,6 +417,7 @@ export default function AdminPage() {
     );
   }
 
+  // ==================== 管理后台主界面 ====================
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -285,12 +425,12 @@ export default function AdminPage() {
         <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold">⚙️ 管理后台</h1>
           <div className="flex items-center gap-4">
-            <span className="text-gray-600">欢迎，{currentUser.username}</span>
+            <span className="text-gray-600">欢迎，<strong>{currentUser.username}</strong></span>
             <button
               onClick={handleLogout}
-              className="text-gray-500 hover:text-red-500"
+              className="px-3 py-1 text-red-500 hover:bg-red-50 rounded"
             >
-              退出
+              退出登录
             </button>
           </div>
         </div>
@@ -307,11 +447,11 @@ export default function AdminPage() {
 
       {/* Tabs */}
       <div className="max-w-6xl mx-auto px-4 mt-4">
-        <div className="flex gap-2">
+        <div className="flex gap-2 flex-wrap">
           <button
             onClick={() => setActiveTab('vocab')}
             className={`px-4 py-2 rounded-lg font-medium ${
-              activeTab === 'vocab' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'
+              activeTab === 'vocab' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             📚 单词管理
@@ -319,33 +459,41 @@ export default function AdminPage() {
           <button
             onClick={() => setActiveTab('users')}
             className={`px-4 py-2 rounded-lg font-medium ${
-              activeTab === 'users' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700'
+              activeTab === 'users' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
             👥 用户管理
+          </button>
+          <button
+            onClick={() => setActiveTab('profile')}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              activeTab === 'profile' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            🔑 修改密码
           </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="max-w-6xl mx-auto px-4 py-6">
+        
+        {/* ==================== 单词管理 ==================== */}
         {activeTab === 'vocab' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-bold mb-4">📚 单词导入</h2>
-            
+          <div className="space-y-6">
             {/* 分类列表 */}
-            <div className="mb-6">
-              <h3 className="font-medium mb-2">现有分类：</h3>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="bg-white rounded-xl shadow p-6">
+              <h2 className="text-lg font-bold mb-4">📁 现有分类</h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {semesters.map(s => (
-                  <div key={s.id} className="border rounded-lg p-3 flex items-center justify-between">
+                  <div key={s.id} className="border rounded-lg p-4 flex items-center justify-between">
                     <div>
-                      <div className="font-medium">{s.name}</div>
-                      <div className="text-sm text-gray-500">{s.wordCount || 0} 词</div>
+                      <div className="font-medium text-lg">{s.name}</div>
+                      <div className="text-sm text-gray-500">{s.wordCount || 0} 个单词</div>
                     </div>
                     <button
                       onClick={() => handleDeleteVocab(s.id, s.name)}
-                      className="text-red-500 hover:text-red-700 text-sm"
+                      className="px-3 py-1 text-red-500 hover:bg-red-50 rounded text-sm"
                     >
                       清空
                     </button>
@@ -354,19 +502,19 @@ export default function AdminPage() {
               </div>
             </div>
 
-            {/* 导入表单 */}
-            <div className="border-t pt-6">
-              <h3 className="font-medium mb-4">导入新单词：</h3>
+            {/* 导入单词 */}
+            <div className="bg-white rounded-xl shadow p-6">
+              <h2 className="text-lg font-bold mb-4">📥 导入单词</h2>
               
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">选择分类</label>
+                  <label className="block text-sm font-medium mb-2">选择分类</label>
                   <select
                     value={selectedSemester || ''}
-                    onChange={(e) => setSelectedSemester(parseInt(e.target.value))}
+                    onChange={(e) => setSelectedSemester(e.target.value ? parseInt(e.target.value) : null)}
                     className="w-full p-3 border rounded-lg"
                   >
-                    <option value="">请选择分类</option>
+                    <option value="">-- 请选择分类 --</option>
                     {semesters.map(s => (
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
@@ -374,16 +522,23 @@ export default function AdminPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1">单词JSON数据</label>
+                  <label className="block text-sm font-medium mb-2">单词数据 (JSON 格式)</label>
                   <textarea
                     value={vocabJson}
                     onChange={(e) => setVocabJson(e.target.value)}
-                    placeholder={`格式示例：
+                    placeholder={`支持两种格式：
+
+格式1（简写）：
 [
   {"w": "apple", "p": "/ˈæpl/", "m": "n. 苹果", "ex": "I eat an apple.", "exc": "我吃苹果。"},
-  {"w": "book", "p": "/bʊk/", "m": "n. 书", "ex": "This is a book.", "exc": "这是一本书。"}
+  {"w": "book", "p": "/bʊk/", "m": "n. 书"}
+]
+
+格式2（完整）：
+[
+  {"word": "apple", "phonetic": "/ˈæpl/", "meaning": "n. 苹果", "exampleEn": "I eat an apple.", "exampleCn": "我吃苹果。"}
 ]`}
-                    className="w-full p-3 border rounded-lg h-48 font-mono text-sm"
+                    className="w-full p-3 border rounded-lg h-64 font-mono text-sm"
                   />
                 </div>
 
@@ -394,7 +549,7 @@ export default function AdminPage() {
                     onChange={(e) => setClearExisting(e.target.checked)}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm">清空现有单词后导入</span>
+                  <span className="text-sm">清空该分类现有单词后导入</span>
                 </label>
 
                 <button
@@ -402,79 +557,206 @@ export default function AdminPage() {
                   disabled={loading}
                   className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50"
                 >
-                  {loading ? '导入中...' : '导入单词'}
+                  {loading ? '导入中...' : '🚀 开始导入'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
+        {/* ==================== 用户管理 ==================== */}
         {activeTab === 'users' && (
-          <div className="bg-white rounded-xl shadow p-6">
-            <h2 className="text-lg font-bold mb-4">👥 用户管理</h2>
+          <div className="space-y-6">
+            {/* 创建用户按钮 */}
+            <div className="bg-white rounded-xl shadow p-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-lg font-bold">👥 用户列表</h2>
+                <button
+                  onClick={() => setShowCreateUser(true)}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  + 创建用户
+                </button>
+              </div>
+              
+              {users.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">暂无用户数据</p>
+              ) : (
+                <div className="overflow-x-auto mt-4">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left py-3 px-4 font-medium">ID</th>
+                        <th className="text-left py-3 px-4 font-medium">用户名</th>
+                        <th className="text-left py-3 px-4 font-medium">角色</th>
+                        <th className="text-left py-3 px-4 font-medium">创建时间</th>
+                        <th className="text-left py-3 px-4 font-medium">最后登录</th>
+                        <th className="text-left py-3 px-4 font-medium">操作</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {users.map(user => (
+                        <tr key={user.id} className="border-b hover:bg-gray-50">
+                          <td className="py-3 px-4">{user.id}</td>
+                          <td className="py-3 px-4 font-medium">{user.username}</td>
+                          <td className="py-3 px-4">
+                            {user.is_admin ? (
+                              <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">管理员</span>
+                            ) : (
+                              <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm">普通用户</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-500">
+                            {new Date(user.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-500">
+                            {user.last_login_at ? new Date(user.last_login_at).toLocaleString() : '-'}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingUser(user);
+                                  setEditUsername(user.username);
+                                  setEditPassword('');
+                                }}
+                                className="text-blue-500 hover:text-blue-700 text-sm"
+                              >
+                                编辑
+                              </button>
+                              {!user.is_admin && (
+                                <button
+                                  onClick={() => handleDeleteUser(user.id, user.username)}
+                                  className="text-red-500 hover:text-red-700 text-sm"
+                                >
+                                  删除
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 修改密码 ==================== */}
+        {activeTab === 'profile' && (
+          <div className="bg-white rounded-xl shadow p-6 max-w-md mx-auto">
+            <h2 className="text-lg font-bold mb-6">🔑 修改密码</h2>
             
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left py-2 px-3">ID</th>
-                    <th className="text-left py-2 px-3">用户名</th>
-                    <th className="text-left py-2 px-3">角色</th>
-                    <th className="text-left py-2 px-3">创建时间</th>
-                    <th className="text-left py-2 px-3">最后登录</th>
-                    <th className="text-left py-2 px-3">操作</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {users.map(user => (
-                    <tr key={user.id} className="border-b hover:bg-gray-50">
-                      <td className="py-2 px-3">{user.id}</td>
-                      <td className="py-2 px-3 font-medium">{user.username}</td>
-                      <td className="py-2 px-3">
-                        {user.is_admin ? (
-                          <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-sm">管理员</span>
-                        ) : (
-                          <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-sm">普通用户</span>
-                        )}
-                      </td>
-                      <td className="py-2 px-3 text-sm text-gray-500">
-                        {new Date(user.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="py-2 px-3 text-sm text-gray-500">
-                        {user.last_login_at ? new Date(user.last_login_at).toLocaleDateString() : '-'}
-                      </td>
-                      <td className="py-2 px-3">
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingUser(user);
-                              setNewUsername(user.username);
-                              setNewPassword('');
-                            }}
-                            className="text-blue-500 hover:text-blue-700 text-sm"
-                          >
-                            编辑
-                          </button>
-                          {!user.is_admin && (
-                            <button
-                              onClick={() => handleDeleteUser(user.id, user.username)}
-                              className="text-red-500 hover:text-red-700 text-sm"
-                            >
-                              删除
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">当前密码</label>
+                <input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="请输入当前密码"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">新密码</label>
+                <input
+                  type="password"
+                  value={newAdminPassword}
+                  onChange={(e) => setNewAdminPassword(e.target.value)}
+                  placeholder="请输入新密码"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-2">确认新密码</label>
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="请再次输入新密码"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+
+              <button
+                onClick={handleChangePassword}
+                disabled={loading}
+                className="w-full py-3 bg-blue-500 text-white rounded-lg font-medium hover:bg-blue-600 disabled:opacity-50"
+              >
+                {loading ? '修改中...' : '确认修改'}
+              </button>
             </div>
           </div>
         )}
       </div>
 
-      {/* Edit User Modal */}
+      {/* ==================== 创建用户弹窗 ==================== */}
+      {showCreateUser && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-md">
+            <h3 className="text-lg font-bold mb-4">创建新用户</h3>
+            
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">用户名</label>
+                <input
+                  type="text"
+                  value={newUsername}
+                  onChange={(e) => setNewUsername(e.target.value)}
+                  placeholder="请输入用户名（2-20字符）"
+                  className="w-full p-3 border rounded-lg"
+                  maxLength={20}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">密码（可选）</label>
+                <input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="留空则无需密码登录"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <label className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  checked={newIsAdmin}
+                  onChange={(e) => setNewIsAdmin(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                <span className="text-sm">设为管理员</span>
+              </label>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateUser(false);
+                  setNewUsername('');
+                  setNewPassword('');
+                  setNewIsAdmin(false);
+                }}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={handleCreateUser}
+                disabled={loading}
+                className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                {loading ? '创建中...' : '创建'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 编辑用户弹窗 ==================== */}
       {editingUser && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-xl p-6 w-full max-w-md">
@@ -485,19 +767,20 @@ export default function AdminPage() {
                 <label className="block text-sm font-medium mb-1">用户名</label>
                 <input
                   type="text"
-                  value={newUsername}
-                  onChange={(e) => setNewUsername(e.target.value)}
+                  value={editUsername}
+                  onChange={(e) => setEditUsername(e.target.value)}
                   className="w-full p-3 border rounded-lg"
+                  maxLength={20}
                 />
               </div>
               <div>
                 <label className="block text-sm font-medium mb-1">新密码（留空不修改）</label>
                 <input
                   type="password"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
+                  value={editPassword}
+                  onChange={(e) => setEditPassword(e.target.value)}
+                  placeholder="输入新密码以修改"
                   className="w-full p-3 border rounded-lg"
-                  placeholder="输入新密码"
                 />
               </div>
             </div>
@@ -506,8 +789,8 @@ export default function AdminPage() {
               <button
                 onClick={() => {
                   setEditingUser(null);
-                  setNewUsername('');
-                  setNewPassword('');
+                  setEditUsername('');
+                  setEditPassword('');
                 }}
                 className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
               >
