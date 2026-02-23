@@ -5,11 +5,11 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const username = searchParams.get('username');
     const semesterIds = searchParams.get('semesterIds');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    if (!username) {
+      return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
     const client = getSupabaseClient();
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('user_progress')
       .select('*')
-      .eq('user_id', userId);
+      .eq('username', username);
 
     if (semesterIds) {
       const ids = semesterIds.split(',').map(id => parseInt(id));
@@ -42,66 +42,82 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, progress } = body;
+    const { username, progress } = body;
 
-    if (!userId || !progress || !Array.isArray(progress)) {
+    if (!username || !progress || !Array.isArray(progress)) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
     const client = getSupabaseClient();
     const results = [];
+    const errors = [];
 
     for (const item of progress) {
-      // Check if progress exists
-      const { data: existing } = await client
-        .from('user_progress')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('word_id', item.wordId)
-        .eq('semester_id', item.semesterId)
-        .single();
+      try {
+        // Check if progress exists
+        const { data: existing } = await client
+          .from('user_progress')
+          .select('id')
+          .eq('username', username)
+          .eq('word_id', item.wordId)
+          .single();
 
-      if (existing) {
-        // Update existing progress
-        const { data, error } = await client
-          .from('user_progress')
-          .update({
-            state: item.state,
-            next_review: item.nextReview,
-            ef: item.ef,
-            interval: item.interval,
-            failure_count: item.failureCount,
-            penalty_progress: item.penaltyProgress,
-            in_penalty: item.inPenalty,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', existing.id)
-          .select();
-        
-        if (!error) results.push(data);
-      } else {
-        // Insert new progress
-        const { data, error } = await client
-          .from('user_progress')
-          .insert({
-            user_id: userId,
-            word_id: item.wordId,
-            semester_id: item.semesterId,
-            state: item.state,
-            next_review: item.nextReview,
-            ef: item.ef,
-            interval: item.interval,
-            failure_count: item.failureCount,
-            penalty_progress: item.penaltyProgress,
-            in_penalty: item.inPenalty,
-          })
-          .select();
-        
-        if (!error) results.push(data);
+        if (existing) {
+          // Update existing progress
+          const { data, error } = await client
+            .from('user_progress')
+            .update({
+              state: item.state,
+              next_review: item.nextReview,
+              ef: item.ef,
+              interval: item.interval,
+              failure_count: item.failureCount,
+              penalty_progress: item.penaltyProgress,
+              in_penalty: item.inPenalty,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id)
+            .select();
+          
+          if (error) {
+            errors.push({ wordId: item.wordId, error: error.message });
+          } else {
+            results.push(data);
+          }
+        } else {
+          // Insert new progress
+          const { data, error } = await client
+            .from('user_progress')
+            .insert({
+              username: username,
+              word_id: item.wordId,
+              semester_id: item.semesterId,
+              state: item.state,
+              next_review: item.nextReview,
+              ef: item.ef,
+              interval: item.interval,
+              failure_count: item.failureCount,
+              penalty_progress: item.penaltyProgress,
+              in_penalty: item.inPenalty,
+            })
+            .select();
+          
+          if (error) {
+            errors.push({ wordId: item.wordId, error: error.message });
+          } else {
+            results.push(data);
+          }
+        }
+      } catch (err) {
+        errors.push({ wordId: item.wordId, error: String(err) });
       }
     }
 
-    return NextResponse.json({ success: true, saved: results.length });
+    return NextResponse.json({ 
+      success: true, 
+      saved: results.length,
+      errors: errors.length > 0 ? errors : undefined
+    });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -112,11 +128,11 @@ export async function POST(request: NextRequest) {
 export async function DELETE(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const username = searchParams.get('username');
     const semesterId = searchParams.get('semesterId');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    if (!username) {
+      return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
     const client = getSupabaseClient();
@@ -124,7 +140,7 @@ export async function DELETE(request: NextRequest) {
     let query = client
       .from('user_progress')
       .delete()
-      .eq('user_id', userId);
+      .eq('username', username);
 
     if (semesterId) {
       query = query.eq('semester_id', parseInt(semesterId));

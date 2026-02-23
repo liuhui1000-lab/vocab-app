@@ -1,17 +1,5 @@
 // Utility functions for vocabulary app
 
-// Generate or get user ID
-export function getUserId(): string {
-  if (typeof window === 'undefined') return '';
-  
-  let userId = localStorage.getItem('vocab_user_id');
-  if (!userId) {
-    userId = `user_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    localStorage.setItem('vocab_user_id', userId);
-  }
-  return userId;
-}
-
 // Format date to YYYY-MM-DD
 export function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
@@ -87,4 +75,4 @@ export function playWord(word: string): void {
   });
 }
 
-import type { WordWithProgress } from './types';
+import type { WordWithProgress } from '@/lib/types';

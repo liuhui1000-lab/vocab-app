@@ -5,12 +5,12 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
-    const userId = searchParams.get('userId');
+    const username = searchParams.get('username');
     const year = searchParams.get('year');
     const semesterId = searchParams.get('semesterId');
 
-    if (!userId) {
-      return NextResponse.json({ error: 'userId is required' }, { status: 400 });
+    if (!username) {
+      return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
     const client = getSupabaseClient();
@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
     let query = client
       .from('study_stats')
       .select('*')
-      .eq('user_id', userId);
+      .eq('username', username);
 
     if (year) {
       query = query.like('date', `${year}%`);
@@ -46,9 +46,9 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { userId, semesterId, date, type } = body;
+    const { username, semesterId, date, type } = body;
 
-    if (!userId || !semesterId || !date || !type) {
+    if (!username || !semesterId || !date || !type) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     const { data: existing } = await client
       .from('study_stats')
       .select('*')
-      .eq('user_id', userId)
+      .eq('username', username)
       .eq('semester_id', semesterId)
       .eq('date', date)
       .single();
@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
       const { data, error } = await client
         .from('study_stats')
         .insert({
-          user_id: userId,
+          username: username,
           semester_id: semesterId,
           date,
           new_count: type === 'new' ? 1 : 0,

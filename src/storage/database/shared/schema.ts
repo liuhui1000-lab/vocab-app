@@ -1,4 +1,4 @@
-import { pgTable, serial, timestamp, varchar, integer, text, boolean, index, jsonb } from "drizzle-orm/pg-core"
+import { pgTable, serial, timestamp, varchar, integer, text, boolean, index, uniqueIndex } from "drizzle-orm/pg-core"
 import { sql } from "drizzle-orm"
 import { createSchemaFactory } from "drizzle-zod"
 import { z } from "zod"
@@ -12,7 +12,25 @@ export const healthCheck = pgTable("health_check", {
 });
 
 // ============================================
-// 学期表
+// 用户表
+// ============================================
+export const users = pgTable(
+  "users",
+  {
+    id: serial().notNull(),
+    username: varchar("username", { length: 50 }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull(),
+    lastLoginAt: timestamp("last_login_at", { withTimezone: true, mode: 'string' }),
+  },
+  (table) => [
+    uniqueIndex("users_username_unique_idx").on(table.username),
+  ]
+);
+
+// ============================================
+// 学期/分类表
 // ============================================
 export const semesters = pgTable(
   "semesters",
@@ -58,13 +76,13 @@ export const vocabWords = pgTable(
 );
 
 // ============================================
-// 用户进度表
+// 用户进度表（使用username关联）
 // ============================================
 export const userProgress = pgTable(
   "user_progress",
   {
     id: serial().notNull(),
-    userId: varchar("user_id", { length: 100 }).notNull(),
+    username: varchar("username", { length: 50 }).notNull(),
     wordId: integer("word_id").notNull(),
     semesterId: integer("semester_id").notNull(),
     state: varchar("state", { length: 20 }).notNull().default('new'),
@@ -82,21 +100,23 @@ export const userProgress = pgTable(
       .notNull(),
   },
   (table) => [
-    index("user_progress_user_id_idx").on(table.userId),
+    index("user_progress_username_idx").on(table.username),
     index("user_progress_word_id_idx").on(table.wordId),
     index("user_progress_semester_id_idx").on(table.semesterId),
-    index("user_progress_user_semester_idx").on(table.userId, table.semesterId),
+    index("user_progress_user_semester_idx").on(table.username, table.semesterId),
+    // 确保同一用户对同一单词只有一条进度记录
+    uniqueIndex("user_progress_username_word_idx").on(table.username, table.wordId),
   ]
 );
 
 // ============================================
-// 学习统计表
+// 学习统计表（使用username关联）
 // ============================================
 export const studyStats = pgTable(
   "study_stats",
   {
     id: serial().notNull(),
-    userId: varchar("user_id", { length: 100 }).notNull(),
+    username: varchar("username", { length: 50 }).notNull(),
     semesterId: integer("semester_id").notNull(),
     date: varchar("date", { length: 10 }).notNull(), // YYYY-MM-DD
     newCount: integer("new_count").notNull().default(0),
@@ -106,9 +126,9 @@ export const studyStats = pgTable(
       .notNull(),
   },
   (table) => [
-    index("study_stats_user_id_idx").on(table.userId),
+    index("study_stats_username_idx").on(table.username),
     index("study_stats_date_idx").on(table.date),
-    index("study_stats_user_date_idx").on(table.userId, table.date),
+    index("study_stats_user_date_idx").on(table.username, table.date),
   ]
 );
 
@@ -117,6 +137,11 @@ export const studyStats = pgTable(
 // ============================================
 const { createInsertSchema: createCoercedInsertSchema } = createSchemaFactory({
   coerce: { date: true },
+});
+
+// User schemas
+export const insertUserSchema = createCoercedInsertSchema(users).pick({
+  username: true,
 });
 
 // Semester schemas
@@ -149,7 +174,7 @@ export const insertVocabWordSchema = createCoercedInsertSchema(vocabWords).pick(
 
 // UserProgress schemas
 export const insertUserProgressSchema = createCoercedInsertSchema(userProgress).pick({
-  userId: true,
+  username: true,
   wordId: true,
   semesterId: true,
   state: true,
@@ -169,7 +194,7 @@ export const updateUserProgressSchema = createCoercedInsertSchema(userProgress)
 
 // StudyStats schemas
 export const insertStudyStatsSchema = createCoercedInsertSchema(studyStats).pick({
-  userId: true,
+  username: true,
   semesterId: true,
   date: true,
   newCount: true,
@@ -179,6 +204,9 @@ export const insertStudyStatsSchema = createCoercedInsertSchema(studyStats).pick
 // ============================================
 // TypeScript Types
 // ============================================
+export type User = typeof users.$inferSelect;
+export type InsertUser = z.infer<typeof insertUserSchema>;
+
 export type Semester = typeof semesters.$inferSelect;
 export type InsertSemester = z.infer<typeof insertSemesterSchema>;
 export type UpdateSemester = z.infer<typeof updateSemesterSchema>;
