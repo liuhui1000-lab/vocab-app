@@ -309,7 +309,13 @@ export default function VocabApp() {
 
   // Next card logic - 完全沿用HTML逻辑
   // tempStep: 0=初始, 1=已学习, 1.5=已通过选择题, 2=完成
-  const nextCard = (currentSessionWords: SessionWord[], currentQueue: SessionWord[]) => {
+  const nextCard = (currentSessionWords: SessionWord[], currentQueue: SessionWord[], waiting: boolean = false) => {
+    // 如果正在等待状态，不重置
+    if (!waiting) {
+      setShowAnswer(false);
+      setSpellResult(null);
+    }
+    
     const pending = currentQueue.filter(w => w.tempStep < 2);
     
     if (pending.length === 0) {
@@ -332,16 +338,21 @@ export default function VocabApp() {
 
     setCurrentWord(next);
     setShowAnswer(false);
-    setSpellResult(null);  // 重置默写结果
+    setSpellResult(null);
     
-    // 模式判断逻辑（沿用HTML）
-    // 新单词: learn(0) -> quiz(1) -> spell -> 完成(2)
-    // 已学单词: quiz(0) -> spell -> 完成(2)
+    // 模式判断逻辑（完全沿用HTML）
+    // HTML: if (w.state === 'new' && w.tempStep === 0) this.modeLearn();
+    //       else if ((w.state === 'new' && w.tempStep === 1) || (w.state !== 'new' && w.tempStep === 0)) this.modeQuiz();
+    //       else this.modeSpell();
+    // 注意：HTML中的 state 是持久状态（'new'/'learning'/'review'），React中对应 progress?.state
+    const wordState = next.progress?.state;  // undefined = 从未学习过，相当于 'new'
+    const isNewWord = !wordState || wordState === 'new';  // 相当于 HTML 中的 state === 'new'
+    
     let newMode: 'learn' | 'quiz' | 'spell';
-    if (next.isNewThisSession && next.tempStep === 0) {
+    if (isNewWord && next.tempStep === 0) {
       // 新单词第一次：学习模式
       newMode = 'learn';
-    } else if ((next.isNewThisSession && next.tempStep === 1) || (!next.isNewThisSession && next.tempStep === 0)) {
+    } else if ((isNewWord && next.tempStep === 1) || (!isNewWord && next.tempStep === 0)) {
       // 新单词第二次 或 已学单词第一次：选择题模式
       newMode = 'quiz';
     } else {
@@ -351,7 +362,7 @@ export default function VocabApp() {
     setMode(newMode);
 
     // 生成选择题选项
-    if (newMode !== 'spell') {
+    if (newMode === 'quiz') {
       generateOptions(next);
     }
   };
@@ -366,18 +377,19 @@ export default function VocabApp() {
     setOptions(shuffleArray([correct, ...shuffled]));
   };
 
+  // 学习模式下一步 - 完全沿用HTML逻辑
   const handleLearnNext = () => {
     if (!currentWord) return;
     
+    // HTML: this.currentCard.tempStep = 1; this.nextCard();
     const updatedSessionWords = sessionWords.map(w => 
       w.id === currentWord.id ? { ...w, tempStep: 1 } : w
     );
     setSessionWords(updatedSessionWords);
-    setCurrentWord({ ...currentWord, tempStep: 1 });
-    setMode('quiz');
-    setShowAnswer(false);
+    nextCard(updatedSessionWords, queue);
   };
 
+  // 选择题答案处理 - 完全沿用HTML逻辑
   const handleQuizAnswer = async (answer: string) => {
     if (!currentWord || showAnswer) return;
     
@@ -385,18 +397,17 @@ export default function VocabApp() {
     setShowAnswer(true);
 
     if (isCorrect) {
-      // 播放发音
+      // HTML: this.currentCard.tempStep = 1.5; this.updateState(true);
       playWord(currentWord.word);
-      // 选择题正确，标记 tempStep = 1.5，准备进入默写
       const updated = sessionWords.map(w => 
         w.id === currentWord.id ? { ...w, tempStep: 1.5 } : w
       );
       setSessionWords(updated);
       setCurrentWord({ ...currentWord, tempStep: 1.5 });
-      // 不更新进度，等默写通过后再更新
+      // HTML: waiting = true，等待点击"下一题"
     } else {
-      // 答错进入惩罚模式
-      playWord(currentWord.word);
+      // HTML: this.currentCard.inPenalty = true; this.currentCard.penaltyProgress = 0;
+      //       this.currentCard.tempStep = 0; this.updateState(false);
       const updated = sessionWords.map(w => 
         w.id === currentWord.id ? { 
           ...w, 
@@ -411,8 +422,9 @@ export default function VocabApp() {
     }
   };
 
+  // 默写检查 - 完全沿用HTML的checkSpelling逻辑
   const handleSpellSubmit = async (input: string) => {
-    if (!currentWord) return { correct: false };
+    if (!currentWord || spellResult?.correct) return { correct: false };
     
     const isCorrect = input.trim().toLowerCase() === currentWord.word.toLowerCase();
     
@@ -424,7 +436,8 @@ export default function VocabApp() {
         // 惩罚模式：需要连续3次正确
         const newPenaltyProgress = currentWord.penaltyProgress + 1;
         if (newPenaltyProgress >= 3) {
-          // 完成！解除惩罚
+          // HTML: this.currentCard.tempStep = 2; this.currentCard.inPenalty = false;
+          //       this.currentCard.penaltyProgress = 0; this.recordProgress('review');
           const updated = sessionWords.map(w => 
             w.id === currentWord.id ? { 
               ...w, 
@@ -440,17 +453,20 @@ export default function VocabApp() {
           await recordStat(username, currentWord.semester_id, 'review');
           return { correct: true, completed: true };
         } else {
-          // 还需要继续巩固
+          // HTML: document.getElementById('next-btn').textContent = `正确！还需 ${3 - this.currentCard.penaltyProgress} 次巩固 →`;
+          //       this.unsavedChanges++;
           const updated = sessionWords.map(w => 
             w.id === currentWord.id ? { ...w, penaltyProgress: newPenaltyProgress } : w
           );
           setSessionWords(updated);
           setCurrentWord({ ...currentWord, penaltyProgress: newPenaltyProgress });
           setSpellResult({ correct: true, needMore: 3 - newPenaltyProgress });
+          // 不更新进度，继续下一个单词
           return { correct: true, needMore: 3 - newPenaltyProgress };
         }
       } else {
         // 正常模式：默写正确，完成！
+        // HTML: this.currentCard.tempStep = 2; this.recordProgress(type); this.updateState(true);
         const updated = sessionWords.map(w => 
           w.id === currentWord.id ? { ...w, tempStep: 2 } : w
         );
@@ -463,6 +479,8 @@ export default function VocabApp() {
       }
     } else {
       // 默写错误：进入惩罚模式
+      // HTML: this.currentCard.inPenalty = true; this.currentCard.penaltyProgress = 0;
+      //       this.currentCard.tempStep = 0; this.updateState(false);
       const updated = sessionWords.map(w => 
         w.id === currentWord.id ? { 
           ...w, 
@@ -485,10 +503,13 @@ export default function VocabApp() {
     
     const { ef, interval, nextReview } = calculateNextReview(success, currentEf, currentInterval);
     
+    // HTML: w.state = success ? 'review' : 'learning'
+    const newState = success ? 'review' : 'learning' as 'review' | 'learning';
+    
     const progressUpdate = {
       wordId: word.id,
       semesterId: word.semester_id,
-      state: success ? 'review' : 'learning',
+      state: newState,
       nextReview: nextReview.toISOString(),
       ef,
       interval,
@@ -498,6 +519,17 @@ export default function VocabApp() {
     };
 
     setUnsavedCount(c => c + 1);
+    
+    // 更新本地 sessionWords 中的 progress.state，确保 nextCard 能正确判断
+    setSessionWords(prev => prev.map(w => {
+      if (w.id === word.id) {
+        return {
+          ...w,
+          progress: w.progress ? { ...w.progress, state: newState } : undefined,
+        };
+      }
+      return w;
+    }));
     
     if (unsavedCount >= 4) {
       await saveProgress(username, [progressUpdate]);
@@ -535,8 +567,26 @@ export default function VocabApp() {
     setCurrentView('finish');
   };
 
+  // handleNext - 完全沿用HTML逻辑
   const handleNext = () => {
-    nextCard(sessionWords, queue);
+    // HTML: if (this.currentMode === 'learn') { this.currentCard.tempStep = 1; this.nextCard(); }
+    if (mode === 'learn') {
+      handleLearnNext();
+    }
+    // HTML: else if (this.currentMode === 'spell') { this.waiting ? this.nextCard() : this.checkSpelling(); }
+    else if (mode === 'spell') {
+      // waiting 表示已完成默写结果的处理（正确或错误都算waiting）
+      if (spellResult) {
+        // 已处理完，进入下一题
+        nextCard(sessionWords, queue);
+      }
+      // 否则不处理，由 onKeyDown 触发 checkSpelling
+    }
+    // HTML: else if (this.waiting) { this.nextCard(); }
+    else if (mode === 'quiz' && showAnswer) {
+      // 选择题已作答，进入下一题
+      nextCard(sessionWords, queue);
+    }
   };
 
   const toggleSemester = (id: number) => {
@@ -853,11 +903,11 @@ export default function VocabApp() {
             {/* Spell input */}
             {mode === 'spell' && (
               <div className="w-full mt-4">
-                {/* 显示提示（首尾字母） */}
-                {!spellResult && (
+                {/* 显示提示（首尾字母）- HTML: if (this.currentCard.state === 'new' && !this.currentCard.inPenalty) */}
+                {(!currentWord.progress?.state || currentWord.progress?.state === 'new') && !currentWord.inPenalty && !spellResult && (
                   <div className="text-center mb-4 text-gray-400 font-mono text-xl tracking-widest">
                     {currentWord.word.split('').map((c, i) => 
-                      i === 0 || i === currentWord.word.length - 1 ? c : '_'
+                      (i === 0 || i === currentWord.word.length - 1) ? c : '_'
                     ).join(' ')}
                   </div>
                 )}
@@ -871,20 +921,12 @@ export default function VocabApp() {
                     spellResult && spellResult.correct ? 'border-green-500 bg-green-50' : ''
                   }`}
                   autoFocus
-                  disabled={spellResult?.correct && spellResult?.completed}
+                  disabled={spellResult?.correct !== undefined}
                   onKeyDown={async (e) => {
-                    if (e.key === 'Enter') {
+                    if (e.key === 'Enter' && !spellResult) {
                       const input = e.target as HTMLInputElement;
-                      const result = await handleSpellSubmit(input.value);
-                      if (result.correct && result.completed) {
-                        // 完成，自动下一题
-                        setTimeout(handleNext, 800);
-                      } else if (result.correct && result.needMore) {
-                        // 需要继续巩固，清空输入继续
-                        input.value = '';
-                        setSpellResult(null);
-                      }
-                      // 错误时显示答案，等待用户点击"再试一次"
+                      await handleSpellSubmit(input.value);
+                      // HTML: 显示结果后等待点击按钮，不自动进入下一题
                     }
                   }}
                 />
@@ -944,7 +986,7 @@ export default function VocabApp() {
             )}
           </div>
 
-          {/* Action button */}
+          {/* Action button - 完全沿用HTML逻辑 */}
           <div className="mt-4">
             {mode === 'learn' && (
               <button
@@ -956,35 +998,24 @@ export default function VocabApp() {
             )}
             {mode === 'quiz' && showAnswer && (
               <button
-                onClick={() => {
-                  // 选择题答对后进入默写，答错则下一题
-                  if (currentWord && currentWord.tempStep >= 1.5) {
-                    setMode('spell');
-                    setShowAnswer(false);
-                    setSpellResult(null);
-                  } else {
-                    handleNext();
-                  }
-                }}
+                onClick={handleNext}
+                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
+              >
+                下一题 →
+              </button>
+            )}
+            {mode === 'spell' && spellResult && (
+              <button
+                onClick={handleNext}
                 className={`w-full py-4 rounded-2xl font-semibold text-lg ${
-                  currentWord && currentWord.tempStep >= 1.5 
+                  spellResult.correct 
                     ? 'bg-green-500 text-white' 
                     : 'bg-blue-500 text-white'
                 }`}
               >
-                {currentWord && currentWord.tempStep >= 1.5 ? '开始默写 ✍️' : '下一题 →'}
-              </button>
-            )}
-            {mode === 'spell' && spellResult && !spellResult.correct && (
-              <button
-                onClick={() => {
-                  setSpellResult(null);
-                  const input = document.getElementById('spell-input') as HTMLInputElement;
-                  if (input) input.value = '';
-                }}
-                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
-              >
-                再试一次 →
+                {spellResult.completed ? '太棒了！已掌握' : 
+                 spellResult.needMore ? `正确！还需 ${spellResult.needMore} 次巩固 →` : 
+                 '下一题 →'}
               </button>
             )}
           </div>
