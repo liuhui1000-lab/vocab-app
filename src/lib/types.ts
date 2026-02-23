@@ -24,7 +24,7 @@ export interface VocabWord {
 
 export interface UserProgress {
   id: number;
-  user_id: string;
+  username: string;
   word_id: number;
   semester_id: number;
   state: 'new' | 'learning' | 'review';
@@ -40,7 +40,7 @@ export interface UserProgress {
 
 export interface StudyStats {
   id: number;
-  user_id: string;
+  username: string;
   semester_id: number;
   date: string;
   new_count: number;
@@ -59,7 +59,7 @@ export interface WordWithProgress extends VocabWord {
 
 // App state
 export interface AppState {
-  userId: string;
+  username: string;
   selectedSemesters: number[];
   words: WordWithProgress[];
   progress: UserProgress[];

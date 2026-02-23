@@ -49,12 +49,16 @@ async function initSampleData() {
   return res.json();
 }
 
-async function loginOrRegister(username: string): Promise<{ success: boolean; user?: any; error?: string; isNew?: boolean }> {
+async function loginOrRegister(username: string, password?: string): Promise<{ success: boolean; user?: any; error?: string; isNew?: boolean }> {
   try {
     const res = await fetch('/api/user', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ 
+        username, 
+        password: password || '',
+        action: 'login' 
+      }),
     });
     const data = await res.json();
     return data;
@@ -70,6 +74,7 @@ export default function VocabApp() {
   const [isCheckingAuth, setIsCheckingAuth] = useState(true);
   const [loginError, setLoginError] = useState('');
   const [inputUsername, setInputUsername] = useState('');
+  const [inputPassword, setInputPassword] = useState('');
 
   // Data state
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -78,7 +83,7 @@ export default function VocabApp() {
   const [isLoading, setIsLoading] = useState(false);
 
   // Learning session state
-  const [currentView, setCurrentView] = useState<'setup' | 'study' | 'finish' | 'stats' | 'list'>('setup');
+  const [currentView, setCurrentView] = useState<'setup' | 'study' | 'finish' | 'stats' | 'list' | 'hard'>('setup');
   const [sessionWords, setSessionWords] = useState<SessionWord[]>([]);
   const [queue, setQueue] = useState<SessionWord[]>([]);
   const [currentWord, setCurrentWord] = useState<SessionWord | null>(null);
@@ -93,20 +98,11 @@ export default function VocabApp() {
   useEffect(() => {
     const savedUsername = localStorage.getItem('vocab_username');
     if (savedUsername) {
-      // 验证用户名是否有效
-      loginOrRegister(savedUsername).then(result => {
-        if (result.success) {
-          setUsername(savedUsername);
-          setIsLoggedIn(true);
-        } else {
-          // 用户名无效，清除
-          localStorage.removeItem('vocab_username');
-        }
-        setIsCheckingAuth(false);
-      });
-    } else {
-      setIsCheckingAuth(false);
+      // 仅验证用户名存在，实际登录在 handleLogin 时进行
+      setUsername(savedUsername);
+      setIsLoggedIn(true);
     }
+    setIsCheckingAuth(false);
   }, []);
 
   // 加载学期数据
@@ -191,12 +187,16 @@ export default function VocabApp() {
     }
 
     setLoginError('');
-    const result = await loginOrRegister(inputUsername.trim());
+    const result = await loginOrRegister(inputUsername.trim(), inputPassword);
     
     if (result.success) {
       setUsername(inputUsername.trim());
       setIsLoggedIn(true);
       localStorage.setItem('vocab_username', inputUsername.trim());
+      // 如果是管理员，存储管理员标识
+      if (result.user?.isAdmin) {
+        localStorage.setItem('vocab_is_admin', 'true');
+      }
     } else {
       setLoginError(result.error || '登录失败');
     }
@@ -232,9 +232,29 @@ export default function VocabApp() {
     const hardCount = allWords.filter(w => 
       w.progress && w.progress.failure_count > 3
     ).length;
+
+    // Per-category stats
+    const categoryStats = semesters
+      .filter(s => selectedSemesterIds.includes(s.id))
+      .map(s => {
+        const categoryWords = allWords.filter(w => w.semester_id === s.id);
+        return {
+          id: s.id,
+          name: s.name,
+          total: categoryWords.length,
+          newCount: categoryWords.filter(w => !w.progress || w.progress.state === 'new').length,
+          reviewCount: categoryWords.filter(w => 
+            w.progress && 
+            w.progress.state !== 'new' && 
+            w.progress.next_review && 
+            new Date(w.progress.next_review) <= now
+          ).length,
+          hardCount: categoryWords.filter(w => w.progress && w.progress.failure_count > 3).length,
+        };
+      });
     
-    return { total, newCount, reviewCount, hardCount };
-  }, [allWords]);
+    return { total, newCount, reviewCount, hardCount, categoryStats };
+  }, [allWords, semesters, selectedSemesterIds]);
 
   const stats = getStats();
 
@@ -527,21 +547,31 @@ export default function VocabApp() {
           </div>
           
           <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">设置用户名</h2>
+            <h2 className="text-lg font-semibold text-gray-700 mb-4">登录</h2>
             <p className="text-sm text-gray-500 mb-4">
-              输入用户名即可保存学习进度，换设备登录可继续学习
+              输入用户名开始学习，换设备登录可继续进度
             </p>
             
-            <input
-              type="text"
-              value={inputUsername}
-              onChange={(e) => setInputUsername(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              placeholder="请输入用户名（2-20字符）"
-              className="w-full p-4 border-2 rounded-xl text-center text-lg focus:border-blue-500 outline-none"
-              maxLength={20}
-              autoFocus
-            />
+            <div className="space-y-3">
+              <input
+                type="text"
+                value={inputUsername}
+                onChange={(e) => setInputUsername(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="用户名"
+                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                maxLength={20}
+                autoFocus
+              />
+              <input
+                type="password"
+                value={inputPassword}
+                onChange={(e) => setInputPassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                placeholder="密码（可选，管理员必填）"
+                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+              />
+            </div>
             
             {loginError && (
               <p className="text-red-500 text-sm mt-2 text-center">{loginError}</p>
@@ -549,15 +579,19 @@ export default function VocabApp() {
             
             <button
               onClick={handleLogin}
-              className="w-full mt-4 py-4 bg-blue-500 text-white rounded-xl font-semibold text-lg hover:bg-blue-600 active:scale-98"
+              className="w-full mt-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600"
             >
-              开始使用
+              登录
             </button>
             
             <p className="text-xs text-gray-400 mt-4 text-center">
               支持：中文、字母、数字、下划线
             </p>
           </div>
+          
+          <p className="text-center text-gray-400 text-sm mt-4">
+            <a href="/admin" className="text-blue-500 hover:underline">管理员入口</a>
+          </p>
         </div>
       </div>
     );
@@ -585,6 +619,7 @@ export default function VocabApp() {
           {/* Dashboard */}
           {selectedSemesterIds.length > 0 && (
             <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
+              {/* Total stats */}
               <div className="grid grid-cols-4 gap-2 text-center">
                 <div>
                   <div className="text-2xl font-bold">{stats.total}</div>
@@ -603,6 +638,26 @@ export default function VocabApp() {
                   <div className="text-xs text-gray-500">💀 困难</div>
                 </div>
               </div>
+              
+              {/* Per-category breakdown */}
+              {stats.categoryStats && stats.categoryStats.length > 1 && (
+                <div className="mt-4 pt-4 border-t">
+                  <div className="text-xs text-gray-500 mb-2">分类详情：</div>
+                  <div className="space-y-2">
+                    {stats.categoryStats.map(cs => (
+                      <div key={cs.id} className="flex items-center justify-between text-sm">
+                        <span className="text-gray-700">{cs.name}</span>
+                        <div className="flex gap-3 text-xs">
+                          <span>{cs.total}词</span>
+                          {cs.newCount > 0 && <span className="text-blue-500">新{cs.newCount}</span>}
+                          {cs.reviewCount > 0 && <span className="text-orange-500">复{cs.reviewCount}</span>}
+                          {cs.hardCount > 0 && <span className="text-red-500">难{cs.hardCount}</span>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
 
@@ -687,6 +742,16 @@ export default function VocabApp() {
               📖 词表
             </button>
           </div>
+          
+          {/* Hard words section */}
+          {stats.hardCount > 0 && (
+            <button
+              onClick={() => setCurrentView('hard')}
+              className="w-full mt-3 py-3 bg-red-50 rounded-xl text-red-600 font-medium hover:bg-red-100"
+            >
+              💀 困难单词 ({stats.hardCount})
+            </button>
+          )}
         </div>
       </div>
     );
@@ -909,13 +974,128 @@ export default function VocabApp() {
             </button>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-sm p-4">
-            <div className="text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">📈</div>
-              <p>统计功能开发中...</p>
-              <p className="text-sm mt-2">将在下次更新中提供详细的学习统计</p>
+          {/* Total stats */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+            <h3 className="font-medium text-gray-600 mb-3">总览</h3>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="text-center p-3 bg-gray-50 rounded-xl">
+                <div className="text-2xl font-bold">{stats.total}</div>
+                <div className="text-xs text-gray-500">总单词数</div>
+              </div>
+              <div className="text-center p-3 bg-blue-50 rounded-xl">
+                <div className="text-2xl font-bold text-blue-600">
+                  {stats.total - stats.newCount}
+                </div>
+                <div className="text-xs text-gray-500">已学习</div>
+              </div>
             </div>
           </div>
+
+          {/* Per-category stats */}
+          {stats.categoryStats && stats.categoryStats.length > 0 && (
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+              <h3 className="font-medium text-gray-600 mb-3">分类统计</h3>
+              <div className="space-y-3">
+                {stats.categoryStats.map(cs => {
+                  const learned = cs.total - cs.newCount;
+                  const progress = cs.total > 0 ? Math.round((learned / cs.total) * 100) : 0;
+                  return (
+                    <div key={cs.id} className="p-3 bg-gray-50 rounded-xl">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium">{cs.name}</span>
+                        <span className="text-sm text-gray-500">{progress}%</span>
+                      </div>
+                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-blue-500 rounded-full transition-all"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                        <span>总数: {cs.total}</span>
+                        <span>待学习: {cs.newCount}</span>
+                        <span>待复习: {cs.reviewCount}</span>
+                        <span>困难: {cs.hardCount}</span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <button
+            onClick={() => setCurrentView('setup')}
+            className="w-full mt-4 py-4 bg-gray-100 rounded-2xl font-medium"
+          >
+            返回
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Hard words view
+  if (currentView === 'hard') {
+    const hardWords = allWords.filter(w => w.progress && w.progress.failure_count > 3);
+    
+    // Group by semester
+    const hardWordsBySemester = new Map<number, { semester: Semester; words: WordWithProgress[] }>();
+    semesters.forEach(s => {
+      const words = hardWords.filter(w => w.semester_id === s.id);
+      if (words.length > 0) {
+        hardWordsBySemester.set(s.id, { semester: s, words });
+      }
+    });
+
+    return (
+      <div className="min-h-screen bg-gray-50 p-4">
+        <div className="max-w-lg mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h1 className="text-xl font-bold">💀 困难单词</h1>
+            <button
+              onClick={() => setCurrentView('setup')}
+              className="text-gray-500"
+            >
+              ✕
+            </button>
+          </div>
+
+          {hardWords.length === 0 ? (
+            <div className="bg-white rounded-2xl shadow-sm p-4 text-center py-8 text-gray-500">
+              <div className="text-4xl mb-2">🎉</div>
+              <p>太棒了！没有困难单词</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {Array.from(hardWordsBySemester.values()).map(({ semester, words }) => (
+                <div key={semester.id}>
+                  <h3 className="font-medium text-gray-600 mb-2 px-1 flex items-center justify-between">
+                    <span>{semester.name}</span>
+                    <span className="text-sm text-gray-400">{words.length}词</span>
+                  </h3>
+                  <div className="space-y-2">
+                    {words.map(word => (
+                      <div
+                        key={word.id}
+                        onClick={() => playWord(word.word)}
+                        className="bg-white rounded-xl p-4 cursor-pointer hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="font-medium">{word.word}</span>
+                          <span className="text-gray-400 text-xs">{word.phonetic}</span>
+                          <span className="text-red-500 text-xs ml-auto">
+                            错误 {word.progress?.failure_count} 次
+                          </span>
+                        </div>
+                        <div className="text-gray-500 text-sm">{word.meaning}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
 
           <button
             onClick={() => setCurrentView('setup')}
@@ -930,6 +1110,18 @@ export default function VocabApp() {
 
   // Word list view
   if (currentView === 'list') {
+    // Group words by semester for better organization
+    const wordsBySemester = new Map<number, { semester: Semester; words: WordWithProgress[] }>();
+    
+    semesters
+      .filter(s => selectedSemesterIds.includes(s.id))
+      .forEach(s => {
+        const words = allWords.filter(w => w.semester_id === s.id);
+        if (words.length > 0) {
+          wordsBySemester.set(s.id, { semester: s, words });
+        }
+      });
+
     return (
       <div className="min-h-screen bg-gray-50 p-4">
         <div className="max-w-lg mx-auto">
@@ -948,20 +1140,28 @@ export default function VocabApp() {
               请先选择分类
             </div>
           ) : (
-            <div className="space-y-2">
-              {allWords.map(word => (
-                <div
-                  key={word.id}
-                  onClick={() => playWord(word.word)}
-                  className="bg-white rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50"
-                >
-                  <span className={`w-2 h-2 rounded-full ${
-                    !word.progress ? 'bg-gray-300' :
-                    word.progress.state === 'review' ? 'bg-green-500' :
-                    word.progress.failure_count > 3 ? 'bg-red-500' : 'bg-orange-500'
-                  }`} />
-                  <span className="font-medium flex-1">{word.word}</span>
-                  <span className="text-gray-500 text-sm truncate max-w-[200px]">{word.meaning}</span>
+            <div className="space-y-4">
+              {Array.from(wordsBySemester.values()).map(({ semester, words }) => (
+                <div key={semester.id}>
+                  <h3 className="font-medium text-gray-600 mb-2 px-1">{semester.name}</h3>
+                  <div className="space-y-2">
+                    {words.map(word => (
+                      <div
+                        key={word.id}
+                        onClick={() => playWord(word.word)}
+                        className="bg-white rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50"
+                      >
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                          !word.progress ? 'bg-gray-300' :
+                          word.progress.state === 'review' ? 'bg-green-500' :
+                          word.progress.failure_count > 3 ? 'bg-red-500' : 'bg-orange-500'
+                        }`} />
+                        <span className="font-medium">{word.word}</span>
+                        <span className="text-gray-400 text-xs">{word.phonetic}</span>
+                        <span className="text-gray-500 text-sm truncate flex-1 text-right">{word.meaning}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
             </div>
