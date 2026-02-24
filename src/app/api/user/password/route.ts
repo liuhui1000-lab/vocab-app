@@ -16,7 +16,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '新密码至少需要4个字符' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 获取用户信息
     const user = await db

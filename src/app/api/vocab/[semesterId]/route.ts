@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { semesterId } = await params;
-    const db = getDB(request);
+    const db = getDB();
     const words = await getVocabWords(db, parseInt(semesterId));
     
     return NextResponse.json({ words });

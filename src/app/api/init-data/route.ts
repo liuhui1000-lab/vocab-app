@@ -115,7 +115,7 @@ const sampleWords = [
 // POST - initialize sample data
 export async function POST(request: Request) {
   try {
-    const db = getDB(request);
+    const db = getDB();
     const body = await request.json().catch(() => ({}));
     const forceReset = body.forceReset === true;
 

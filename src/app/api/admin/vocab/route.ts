@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 验证管理员权限
     const adminCheck = await checkAdmin(db, adminUsername);
@@ -144,7 +144,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'semesterId is required' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     const result = await db
       .prepare('SELECT * FROM vocab_words WHERE semester_id = ? ORDER BY "order" ASC')
@@ -173,7 +173,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'semesterId is required' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 验证管理员权限
     const adminCheck = await checkAdmin(db, adminUsername);

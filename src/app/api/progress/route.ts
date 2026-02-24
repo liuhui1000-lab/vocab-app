@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     let result;
     if (semesterIds) {
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
     const results = [];
     const errors = [];
 
@@ -112,7 +112,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     if (semesterId) {
       await db

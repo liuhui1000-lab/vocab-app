@@ -14,7 +14,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     let sql = 'SELECT * FROM study_stats WHERE username = ?';
     const params: (string | number)[] = [username];
@@ -57,7 +57,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
     const updateField = type === 'new' ? 'new_count' : 'review_count';
 
     // SQLite 的 UPSERT 语法

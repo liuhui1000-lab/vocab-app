@@ -9,7 +9,7 @@ export async function GET(request: Request) {
     const username = searchParams.get('username');
     const action = searchParams.get('action');
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 如果是检查用户名是否存在
     if (username && action !== 'list') {
@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '用户名只能包含中文、字母、数字和下划线' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 检查用户是否已存在
     const existingUser = await db
@@ -195,7 +195,7 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 验证操作者权限
     const operator = await db
@@ -272,7 +272,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: '缺少参数' }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 验证操作者权限
     const operator = await db

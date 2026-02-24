@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 验证学期是否存在
     const semester = await db
@@ -128,7 +128,7 @@ export async function GET(request: Request) {
       }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     const result = await db
       .prepare('SELECT * FROM vocab_words WHERE semester_id = ? ORDER BY "order" ASC')
@@ -154,7 +154,7 @@ export async function DELETE(request: Request) {
       }, { status: 400 });
     }
 
-    const db = getDB(request);
+    const db = getDB();
 
     // 先删除相关进度
     await db
