@@ -158,71 +158,94 @@ export default function AdminPage() {
     }
 
     let words;
+    let jsonStr = vocabJson.trim();
+    
+    // 自动补全方括号（如果用户只粘贴了对象列表）
+    if (!jsonStr.startsWith('[')) {
+      jsonStr = '[' + jsonStr;
+    }
+    if (!jsonStr.endsWith(']')) {
+      // 移除末尾可能的逗号
+      jsonStr = jsonStr.replace(/,\s*$/, '');
+      jsonStr = jsonStr + ']';
+    }
+
     try {
       // 先尝试标准JSON解析
-      words = JSON.parse(vocabJson);
+      words = JSON.parse(jsonStr);
     } catch (jsonError) {
       try {
         // 如果失败，尝试解析JavaScript对象格式（字段无引号）
-        words = new Function('return [' + vocabJson + ']')();
+        words = new Function('return ' + jsonStr)();
       } catch (jsError) {
-        // 提取错误位置信息
-        const jsonMsg = jsonError instanceof Error ? jsonError.message : String(jsonError);
+        // 提取错误位置
         const jsMsg = jsError instanceof Error ? jsError.message : String(jsError);
         
-        // 尝试找出出错位置
+        // 尝试定位具体错误
         let errorDetail = '';
+        const lines = jsonStr.split('\n');
+        
+        // 从错误信息中提取位置
+        const posMatch = jsMsg.match(/line (\d+)/i);
+        if (posMatch) {
+          const lineNum = parseInt(posMatch[1]);
+          const actualLine = lines[lineNum - 1];
+          if (actualLine) {
+            errorDetail = `第 ${lineNum} 行附近有问题:\n"${actualLine.trim().substring(0, 60)}${actualLine.length > 60 ? '...' : ''}"`;
+          }
+        }
         
         // 检查常见问题
-        const lines = vocabJson.split('\n');
-        for (let i = 0; i < lines.length; i++) {
-          const line = lines[i];
-          const lineNum = i + 1;
-          
-          // 检查最后一个对象是否缺少闭合
-          const openBraces = (line.match(/\{/g) || []).length;
-          const closeBraces = (line.match(/\}/g) || []).length;
-          
-          // 检查引号是否匹配
-          const quotes = (line.match(/"/g) || []).length;
-          const singleQuotes = (line.match(/'/g) || []).length;
-          
-          // 检查常见语法错误
-          if (line.includes(',}') || line.includes(',]')) {
-            errorDetail = `第 ${lineNum} 行: 多余的逗号 → "${line.trim()}"`;
-            break;
+        if (!errorDetail) {
+          for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const lineNum = i + 1;
+            
+            if (line.includes('“') || line.includes('”')) {
+              errorDetail = `第 ${lineNum} 行: 发现中文引号 ""，请改为英文引号 ""`;
+              break;
+            }
+            if (line.includes('：') && !line.includes(':')) {
+              errorDetail = `第 ${lineNum} 行: 发现中文冒号，请改为英文冒号 :`;
+              break;
+            }
+            if (line.includes('，') && !line.includes(',')) {
+              errorDetail = `第 ${lineNum} 行: 发现中文逗号，请改为英文逗号 ,`;
+              break;
+            }
+            if (/, *\}/.test(line) || /, *\]/.test(line)) {
+              errorDetail = `第 ${lineNum} 行: 最后一个元素后多了逗号，请删除`;
+              break;
+            }
           }
-          if (line.includes('“') || line.includes('”')) {
-            errorDetail = `第 ${lineNum} 行: 使用了中文引号，请改为英文引号 → "${line.trim()}"`;
-            break;
-          }
-          if (line.includes('：') && !line.includes(':')) {
-            errorDetail = `第 ${lineNum} 行: 使用了中文冒号，请改为英文冒号 → "${line.trim()}"`;
-            break;
-          }
-          if (line.includes('，') && !line.includes(',')) {
-            errorDetail = `第 ${lineNum} 行: 使用了中文逗号，请改为英文逗号 → "${line.trim()}"`;
-            break;
+        }
+        
+        // 检查括号匹配
+        if (!errorDetail) {
+          const openBraces = (jsonStr.match(/\{/g) || []).length;
+          const closeBraces = (jsonStr.match(/\}/g) || []).length;
+          const openBrackets = (jsonStr.match(/\[/g) || []).length;
+          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
+          
+          if (openBraces !== closeBraces) {
+            const diff = openBraces - closeBraces;
+            errorDetail = `大括号数量不匹配: 少了 ${Math.abs(diff)} 个 "${diff > 0 ? '}' : '{'}"`;
+          } else if (openBrackets !== closeBrackets) {
+            const diff = openBrackets - closeBrackets;
+            errorDetail = `方括号数量不匹配: 少了 ${Math.abs(diff)} 个 "${diff > 0 ? ']' : '['}"`;
           }
         }
         
         if (!errorDetail) {
-          // 尝试找出缺少闭合的位置
-          const openBraces = (vocabJson.match(/\{/g) || []).length;
-          const closeBraces = (vocabJson.match(/\}/g) || []).length;
-          const openBrackets = (vocabJson.match(/\[/g) || []).length;
-          const closeBrackets = (vocabJson.match(/\]/g) || []).length;
-          
-          if (openBraces !== closeBraces) {
-            errorDetail = `大括号不匹配: { 有 ${openBraces} 个, } 有 ${closeBraces} 个`;
-          } else if (openBrackets !== closeBrackets) {
-            errorDetail = `方括号不匹配: [ 有 ${openBrackets} 个, ] 有 ${closeBrackets} 个`;
+          // 提取更友好的错误信息
+          if (jsMsg.includes('Unexpected')) {
+            errorDetail = '语法格式有误，请检查是否有多余符号或缺少引号';
           } else {
-            errorDetail = `解析错误: ${jsonMsg}`;
+            errorDetail = jsMsg.substring(0, 100);
           }
         }
         
-        showMessage('error', `格式错误 - ${errorDetail}`);
+        showMessage('error', `导入失败: ${errorDetail}`);
         return;
       }
     }
