@@ -201,6 +201,23 @@ export default function AdminPage() {
             const line = lines[i];
             const lineNum = i + 1;
             
+            // 检查重复字段（如两个 ex:）
+            const fieldMatches = line.match(/\b(w|p|m|ex|exc|word|phonetic|meaning|exampleEn|exampleCn)\s*:/g);
+            if (fieldMatches) {
+              const fieldCounts: Record<string, number> = {};
+              fieldMatches.forEach(f => {
+                const fieldName = f.replace(/\s*:/, '').trim();
+                fieldCounts[fieldName] = (fieldCounts[fieldName] || 0) + 1;
+              });
+              for (const [field, count] of Object.entries(fieldCounts)) {
+                if (count > 1) {
+                  errorDetail = `第 ${lineNum} 行: 字段 "${field}" 重复出现\n"${line.trim()}"`;
+                  break;
+                }
+              }
+              if (errorDetail) break;
+            }
+            
             if (line.includes('“') || line.includes('”')) {
               errorDetail = `第 ${lineNum} 行: 发现中文引号 ""，请改为英文引号 ""`;
               break;
