@@ -4,8 +4,8 @@
   "private": true,
   "scripts": {
     "build": "bash ./scripts/build.sh",
-    "build:cf": "next build",
-    "deploy:cf": "npx wrangler pages deploy .next --project-name=vocab-app",
+    "build:cf": "npx @cloudflare/next-on-pages",
+    "deploy:cf": "pnpm run build:cf && wrangler pages deploy .vercel/output/static --project-name=vocab-app",
     "dev": "bash ./scripts/dev.sh",
     "preinstall": "npx only-allow pnpm",
     "lint": "eslint",
@@ -85,7 +85,8 @@
     "react-dev-inspector": "^2.0.1",
     "shadcn": "latest",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5.9.3",
+    "vercel": "^50.22.1"
   },
   "packageManager": "pnpm@9.0.0",
   "engines": {

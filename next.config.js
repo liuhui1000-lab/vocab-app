@@ -1,6 +1,5 @@
-import type { NextConfig } from 'next';
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   allowedDevOrigins: ['*.dev.coze.site'],
   
   images: {
@@ -18,7 +17,9 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
+    // Disable turbopack for better compatibility
+    turbo: undefined,
   },
 };
 
-export default nextConfig;
+module.exports = nextConfig;
