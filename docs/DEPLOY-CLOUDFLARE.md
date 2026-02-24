@@ -2,6 +2,13 @@
 
 本项目使用 Cloudflare Pages + D1 数据库架构，提供 5GB 存储和每月 500 万次读取的免费额度。
 
+## 技术栈
+
+- **框架**: Next.js 16 (App Router)
+- **构建适配器**: OpenNext for Cloudflare
+- **数据库**: Cloudflare D1 (SQLite)
+- **部署平台**: Cloudflare Pages
+
 ## 一、前置准备
 
 ### 1. 安装 Wrangler CLI
@@ -28,16 +35,6 @@ wrangler d1 create vocab-app-db
 binding = "DB"
 database_name = "vocab-app-db"
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-
-{
-  "d1_databases": [
-    {
-      "binding": "vocab_app_db",
-      "database_name": "vocab-app-db",
-      "database_id": "12fd5fec-39ad-4cf8-86cf-0df736b2179a"
-    }
-  ]
-}
 ```
 
 ### 2. 更新 wrangler.toml
@@ -45,8 +42,13 @@ database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 ```toml
 name = "vocab-app"
+main = ".open-next/worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
 
 [[d1_databases]]
 binding = "DB"
@@ -85,8 +87,8 @@ wrangler d1 execute vocab-app-db --remote --command="SELECT name FROM sqlite_mas
 
 3. **配置构建设置**
    - 框架预设：Next.js
-   - 构建命令：`pnpm run build`
-   - 构建输出目录：`.next`
+   - 构建命令：`pnpm run build:cf`
+   - 构建输出目录：`.open-next`
 
 4. **绑定 D1 数据库**
    - 部署完成后，进入项目设置 → Functions → D1 database bindings
@@ -100,11 +102,11 @@ wrangler d1 execute vocab-app-db --remote --command="SELECT name FROM sqlite_mas
 ### 方式二：通过 CLI 部署
 
 ```bash
-# 构建
-pnpm run build
+# 构建（使用 OpenNext）
+pnpm run build:cf
 
 # 部署
-wrangler pages deploy .next --project-name=vocab-app
+pnpm run deploy:cf
 ```
 
 然后在 Dashboard 中绑定 D1 数据库。
@@ -145,15 +147,11 @@ wrangler d1 execute vocab-app-db --remote --command="UPDATE users SET is_admin =
 
 ### 使用 Wrangler 本地开发
 ```bash
-# 先构建
-pnpm run build
+# 构建
+pnpm run build:cf
 
-# 启动本地开发环境（带 D1）
-wrangler pages dev .next \
-  --compatibility-flag=nodejs_compat \
-  --d1=DB=vocab-app-db \
-  --local \
-  --port=5000
+# 本地预览（带 D1）
+pnpm run preview:cf
 ```
 
 ### 初始化本地数据库
@@ -190,3 +188,17 @@ Cloudflare Pages 免费额度：
 - 无限带宽
 
 完全足够中小型单词应用使用。
+
+## 十、故障排除
+
+### API 返回 500 错误
+
+1. 检查 D1 数据库绑定是否正确
+2. 检查数据库表是否已创建
+3. 查看函数日志：Dashboard → Pages → 项目 → Functions → Logs
+
+### 构建失败
+
+1. 确保 Node.js 版本 >= 18
+2. 使用 pnpm 作为包管理器
+3. 检查 `open-next.config.ts` 配置是否正确
