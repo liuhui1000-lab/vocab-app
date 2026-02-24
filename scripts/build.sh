@@ -104,3 +104,29 @@ ls -la .open-next/assets/_next/static/chunks/ 2>/dev/null || echo "No chunks in 
 echo "=========================================="
 
 echo "Build completed successfully!"
+
+# 生成 _routes.json 文件，配置 Cloudflare Pages 的路由规则
+# 这确保静态资源由 Cloudflare 的静态资源服务器处理，而不是 worker
+echo "Generating _routes.json for Cloudflare Pages..."
+cat > .open-next/_routes.json << 'EOF'
+{
+  "version": 1,
+  "include": ["/*"],
+  "exclude": [
+    "/_next/static/*",
+    "/favicon.ico",
+    "/*.svg",
+    "/*.png",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.gif",
+    "/*.webp",
+    "/*.ico",
+    "/*.woff",
+    "/*.woff2",
+    "/*.ttf",
+    "/*.eot"
+  ]
+}
+EOF
+echo "Created _routes.json"
