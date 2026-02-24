@@ -20,8 +20,8 @@ compatibility_flags = ["nodejs_compat"]
 # ============================================
 [[d1_databases]]
 binding = "DB"
-database_name = "vocab-db"
-database_id = "your-database-id-here"  # 替换为实际的 database_id
+database_name = "vocab-app-db"
+database_id = "12fd5fec-39ad-4cf8-86cf-0df736b2179a"  # 替换为实际的 database_id
 
 # ============================================
 # Pages 项目配置

@@ -28,6 +28,16 @@ wrangler d1 create vocab-app-db
 binding = "DB"
 database_name = "vocab-app-db"
 database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+
+{
+  "d1_databases": [
+    {
+      "binding": "vocab_app_db",
+      "database_name": "vocab-app-db",
+      "database_id": "12fd5fec-39ad-4cf8-86cf-0df736b2179a"
+    }
+  ]
+}
 ```
 
 ### 2. 更新 wrangler.toml
