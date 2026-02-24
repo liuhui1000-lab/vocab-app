@@ -1,27 +1,10 @@
-# ============================================
-# Cloudflare Pages + D1 配置
-# 中考词汇通
-# ============================================
-
-# 项目名称
+# Cloudflare Pages 配置
 name = "vocab-app"
-
-# 兼容日期
 compatibility_date = "2024-01-01"
-
-# Node.js 兼容标志
 compatibility_flags = ["nodejs_compat"]
 
-# ============================================
 # D1 数据库绑定
-# ============================================
 [[d1_databases]]
 binding = "DB"
 database_name = "vocab-app-db"
 database_id = "12fd5fec-39ad-4cf8-86cf-0df736b2179a"
-
-# ============================================
-# Pages 项目配置
-# ============================================
-[assets]
-directory = ".next"
