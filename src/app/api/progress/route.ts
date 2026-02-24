@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db-helpers';
 
-export const runtime = 'edge';
 
 // GET user progress for selected semesters
 export async function GET(request: Request) {

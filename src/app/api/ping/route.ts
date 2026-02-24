@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 
-export const runtime = 'edge';
 
 // 健康检查接口 - 用于诊断 Cloudflare Pages Functions 配置
 export async function GET(request: Request) {

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db-helpers';
 
-export const runtime = 'edge';
 
 // POST - 批量导入单词
 // 格式: { semesterId: number, words: Array<{w, p, m, ex, exc}> }

@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db-helpers';
 
-export const runtime = 'edge';
 
 // 验证管理员权限
 async function checkAdmin(db: any, username: string): Promise<{ success: boolean; error?: string }> {

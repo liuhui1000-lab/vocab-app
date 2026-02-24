@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db-helpers';
 
-export const runtime = 'edge';
 
 // POST - 修改密码
 export async function POST(request: Request) {

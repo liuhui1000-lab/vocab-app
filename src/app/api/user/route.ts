@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getDB } from '@/lib/db-helpers';
 
-export const runtime = 'edge';
 
 // GET - 获取所有用户（仅管理员）
 export async function GET(request: Request) {
