@@ -970,11 +970,6 @@ export default function VocabApp() {
 
         {/* Card area */}
         <div className="flex-1 p-4 flex flex-col">
-          {/* DEBUG INFO - 临时调试 */}
-          <div className="text-xs text-gray-400 mb-2 text-center">
-            mode: {mode} | tempStep: {currentWord.tempStep} | isNew: {!currentWord.progress?.state || currentWord.progress?.state === 'new' ? 'Y' : 'N'}
-          </div>
-          
           <div className="bg-white rounded-2xl shadow-sm p-6 flex-1 flex flex-col items-center justify-center">
             {/* Word display */}
             {mode === 'spell' ? (
@@ -1014,16 +1009,9 @@ export default function VocabApp() {
             {/* Spell input */}
             {mode === 'spell' && (
               <div className="w-full mt-4">
-                {/* 显示提示（首尾字母）- HTML: if (this.currentCard.state === 'new' && !this.currentCard.inPenalty) */}
-                {(!currentWord.progress?.state || currentWord.progress?.state === 'new') && !currentWord.inPenalty && !spellResult && (
-                  <div className="text-center mb-4 text-gray-400 font-mono text-xl tracking-widest">
-                    {currentWord.word.split('').map((c, i) => 
-                      (i === 0 || i === currentWord.word.length - 1) ? c : '_'
-                    ).join(' ')}
-                  </div>
-                )}
                 <input
                   id="spell-input"
+                  key={currentWord?.id}  // 当单词变化时，强制重新创建输入框，清空内容
                   type="text"
                   placeholder="输入单词"
                   className={`w-full text-center text-2xl p-4 border-2 rounded-xl focus:border-blue-500 outline-none ${
@@ -1037,7 +1025,6 @@ export default function VocabApp() {
                     if (e.key === 'Enter' && !spellResult) {
                       const input = e.target as HTMLInputElement;
                       await handleSpellSubmit(input.value);
-                      // HTML: 显示结果后等待点击按钮，不自动进入下一题
                     }
                   }}
                 />
@@ -1113,6 +1100,19 @@ export default function VocabApp() {
                 className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
               >
                 下一题 →
+              </button>
+            )}
+            {mode === 'spell' && !spellResult && (
+              <button
+                onClick={() => {
+                  const input = document.getElementById('spell-input') as HTMLInputElement;
+                  if (input) {
+                    handleSpellSubmit(input.value);
+                  }
+                }}
+                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
+              >
+                提交
               </button>
             )}
             {mode === 'spell' && spellResult && (
