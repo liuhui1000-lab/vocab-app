@@ -16,13 +16,17 @@ const nextConfig: NextConfig = {
       },
     ],
     // Cloudflare Pages 不支持 Next.js 图片优化
-    // 部署到 Cloudflare 时取消注释：
-    // unoptimized: true,
+    unoptimized: true,
   },
   
-  // Cloudflare 静态导出配置（部署时取消注释）
-  // output: 'export',
-  // trailingSlash: true,
+  // Cloudflare Pages 适配
+  // 使用 @cloudflare/next-on-pages 时需要 edge runtime
+  experimental: {
+    // 启用服务器操作
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+  },
 };
 
 export default nextConfig;

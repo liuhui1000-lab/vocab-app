@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // GET user progress for selected semesters
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
@@ -12,34 +14,37 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
-    let query = client
-      .from('user_progress')
-      .select('*')
-      .eq('username', username);
-
+    let result;
     if (semesterIds) {
       const ids = semesterIds.split(',').map(id => parseInt(id));
-      query = query.in('semester_id', ids);
+      const placeholders = ids.map(() => '?').join(',');
+      const sql = `SELECT * FROM user_progress WHERE username = ? AND semester_id IN (${placeholders})`;
+      const params = [username, ...ids];
+      result = await (db.prepare(sql) as any).bind(...params).all();
+    } else {
+      result = await db
+        .prepare('SELECT * FROM user_progress WHERE username = ?')
+        .bind(username)
+        .all();
     }
 
-    const { data, error } = await query;
-
-    if (error) {
-      console.error('Error fetching progress:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ progress: data });
+    return NextResponse.json({ progress: result.results });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fetching progress:', error);
+    
+    // 本地开发时的后备数据
+    if (error instanceof Error && error.message.includes('not available')) {
+      return NextResponse.json({ progress: [] });
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // POST - save user progress
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { username, progress } = body;
@@ -48,66 +53,39 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
     const results = [];
     const errors = [];
 
     for (const item of progress) {
       try {
-        // Check if progress exists
-        const { data: existing } = await client
-          .from('user_progress')
-          .select('id')
-          .eq('username', username)
-          .eq('word_id', item.wordId)
-          .single();
-
-        if (existing) {
-          // Update existing progress
-          const { data, error } = await client
-            .from('user_progress')
-            .update({
-              state: item.state,
-              next_review: item.nextReview,
-              ef: item.ef,
-              interval: item.interval,
-              failure_count: item.failureCount,
-              penalty_progress: item.penaltyProgress,
-              in_penalty: item.inPenalty,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', existing.id)
-            .select();
-          
-          if (error) {
-            errors.push({ wordId: item.wordId, error: error.message });
-          } else {
-            results.push(data);
-          }
-        } else {
-          // Insert new progress
-          const { data, error } = await client
-            .from('user_progress')
-            .insert({
-              username: username,
-              word_id: item.wordId,
-              semester_id: item.semesterId,
-              state: item.state,
-              next_review: item.nextReview,
-              ef: item.ef,
-              interval: item.interval,
-              failure_count: item.failureCount,
-              penalty_progress: item.penaltyProgress,
-              in_penalty: item.inPenalty,
-            })
-            .select();
-          
-          if (error) {
-            errors.push({ wordId: item.wordId, error: error.message });
-          } else {
-            results.push(data);
-          }
-        }
+        await db
+          .prepare(`
+            INSERT INTO user_progress (username, word_id, semester_id, state, next_review, ef, "interval", failure_count, in_penalty, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+            ON CONFLICT(username, word_id) DO UPDATE SET
+              state = excluded.state,
+              next_review = excluded.next_review,
+              ef = excluded.ef,
+              "interval" = excluded."interval",
+              failure_count = excluded.failure_count,
+              in_penalty = excluded.in_penalty,
+              updated_at = datetime('now')
+          `)
+          .bind(
+            username,
+            item.wordId,
+            item.semesterId,
+            item.state,
+            item.nextReview,
+            item.ef,
+            item.interval,
+            item.failureCount,
+            item.inPenalty ? 1 : 0
+          )
+          .run();
+        
+        results.push({ wordId: item.wordId });
       } catch (err) {
         errors.push({ wordId: item.wordId, error: String(err) });
       }
@@ -125,7 +103,7 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - reset user progress for a semester
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
@@ -135,22 +113,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
-
-    let query = client
-      .from('user_progress')
-      .delete()
-      .eq('username', username);
+    const db = getDB(request);
 
     if (semesterId) {
-      query = query.eq('semester_id', parseInt(semesterId));
-    }
-
-    const { error } = await query;
-
-    if (error) {
-      console.error('Error deleting progress:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      await db
+        .prepare('DELETE FROM user_progress WHERE username = ? AND semester_id = ?')
+        .bind(username, semesterId)
+        .run();
+    } else {
+      await db
+        .prepare('DELETE FROM user_progress WHERE username = ?')
+        .bind(username)
+        .run();
     }
 
     return NextResponse.json({ success: true });

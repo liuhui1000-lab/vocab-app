@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // GET study stats
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const username = searchParams.get('username');
@@ -13,37 +15,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'username is required' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
-    let query = client
-      .from('study_stats')
-      .select('*')
-      .eq('username', username);
+    let sql = 'SELECT * FROM study_stats WHERE username = ?';
+    const params: (string | number)[] = [username];
 
     if (year) {
-      query = query.like('date', `${year}%`);
+      sql += ' AND date LIKE ?';
+      params.push(`${year}%`);
     }
 
     if (semesterId) {
-      query = query.eq('semester_id', parseInt(semesterId));
+      sql += ' AND semester_id = ?';
+      params.push(parseInt(semesterId));
     }
 
-    const { data, error } = await query.order('date', { ascending: true });
+    sql += ' ORDER BY date ASC';
 
-    if (error) {
-      console.error('Error fetching stats:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const stmt = db.prepare(sql).bind(...params);
+    const result = await stmt.all();
 
-    return NextResponse.json({ stats: data });
+    return NextResponse.json({ stats: result.results });
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fetching stats:', error);
+    
+    // 本地开发时的后备数据
+    if (error instanceof Error && error.message.includes('not available')) {
+      return NextResponse.json({ stats: [] });
+    }
+    
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
 
 // POST - record study stats
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { username, semesterId, date, type } = body;
@@ -52,54 +58,27 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
+    const updateField = type === 'new' ? 'new_count' : 'review_count';
 
-    // Check if record exists
-    const { data: existing } = await client
-      .from('study_stats')
-      .select('*')
-      .eq('username', username)
-      .eq('semester_id', semesterId)
-      .eq('date', date)
-      .single();
+    // SQLite 的 UPSERT 语法
+    await db
+      .prepare(`
+        INSERT INTO study_stats (username, semester_id, date, new_count, review_count)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(username, semester_id, date) DO UPDATE SET
+          ${updateField} = ${updateField} + 1
+      `)
+      .bind(
+        username,
+        semesterId,
+        date,
+        type === 'new' ? 1 : 0,
+        type === 'review' ? 1 : 0
+      )
+      .run();
 
-    if (existing) {
-      // Update existing record
-      const updateField = type === 'new' ? 'new_count' : 'review_count';
-      const { data, error } = await client
-        .from('study_stats')
-        .update({
-          [updateField]: (existing[updateField as keyof typeof existing] as number) + 1,
-        })
-        .eq('id', existing.id)
-        .select();
-
-      if (error) {
-        console.error('Error updating stats:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, data });
-    } else {
-      // Insert new record
-      const { data, error } = await client
-        .from('study_stats')
-        .insert({
-          username: username,
-          semester_id: semesterId,
-          date,
-          new_count: type === 'new' ? 1 : 0,
-          review_count: type === 'review' ? 1 : 0,
-        })
-        .select();
-
-      if (error) {
-        console.error('Error inserting stats:', error);
-        return NextResponse.json({ error: error.message }, { status: 500 });
-      }
-
-      return NextResponse.json({ success: true, data });
-    }
+    return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

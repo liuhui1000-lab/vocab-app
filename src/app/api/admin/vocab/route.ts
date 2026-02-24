@@ -1,22 +1,23 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // 验证管理员权限
-async function checkAdmin(client: any, username: string): Promise<{ success: boolean; error?: string }> {
-  const { data: user } = await client
-    .from('users')
-    .select('is_admin')
-    .eq('username', username)
-    .single();
+async function checkAdmin(db: any, username: string): Promise<{ success: boolean; error?: string }> {
+  const user = await db
+    .prepare('SELECT is_admin FROM users WHERE username = ?')
+    .bind(username)
+    .first();
 
-  if (!user?.is_admin) {
+  if (!user || (user as any).is_admin !== 1) {
     return { success: false, error: '需要管理员权限' };
   }
   return { success: true };
 }
 
 // POST - 批量导入单词（仅管理员）
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { adminUsername, semesterId, words, clearExisting } = body;
@@ -31,20 +32,19 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
     // 验证管理员权限
-    const adminCheck = await checkAdmin(client, adminUsername);
+    const adminCheck = await checkAdmin(db, adminUsername);
     if (!adminCheck.success) {
       return NextResponse.json({ error: adminCheck.error }, { status: 403 });
     }
 
     // 验证学期是否存在
-    const { data: semester } = await client
-      .from('semesters')
-      .select('id, name')
-      .eq('id', semesterId)
-      .single();
+    const semester = await db
+      .prepare('SELECT id, name FROM semesters WHERE id = ?')
+      .bind(semesterId)
+      .first();
 
     if (!semester) {
       return NextResponse.json({ error: '分类不存在' }, { status: 404 });
@@ -52,28 +52,26 @@ export async function POST(request: NextRequest) {
 
     // 如果需要，清空现有单词
     if (clearExisting) {
-      await client
-        .from('user_progress')
-        .delete()
-        .eq('semester_id', semesterId);
+      await db
+        .prepare('DELETE FROM user_progress WHERE semester_id = ?')
+        .bind(semesterId)
+        .run();
       
-      await client
-        .from('vocab_words')
-        .delete()
-        .eq('semester_id', semesterId);
+      await db
+        .prepare('DELETE FROM vocab_words WHERE semester_id = ?')
+        .bind(semesterId)
+        .run();
     }
 
     // 获取当前最大order
-    const { data: existingWords } = await client
-      .from('vocab_words')
-      .select('order')
-      .eq('semester_id', semesterId)
-      .order('order', { ascending: false })
-      .limit(1);
-
+    const maxOrderResult = await db
+      .prepare('SELECT MAX("order") as max_order FROM vocab_words WHERE semester_id = ?')
+      .bind(semesterId)
+      .first();
+    
     let startOrder = 0;
-    if (existingWords && existingWords.length > 0) {
-      startOrder = (existingWords[0].order || 0) + 1;
+    if (maxOrderResult && (maxOrderResult as any).max_order !== null) {
+      startOrder = (maxOrderResult as any).max_order + 1;
     }
 
     // 转换单词格式 - 支持多种格式
@@ -96,28 +94,37 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 批量插入（每次最多100条）
-    const batchSize = 100;
+    // 批量插入（D1 不支持批量 INSERT，需要逐个插入）
     let insertedCount = 0;
     const errors = [];
 
-    for (let i = 0; i < validWords.length; i += batchSize) {
-      const batch = validWords.slice(i, i + batchSize);
-      const { data, error } = await client
-        .from('vocab_words')
-        .insert(batch)
-        .select();
-
-      if (error) {
-        errors.push(`批次 ${Math.floor(i / batchSize) + 1}: ${error.message}`);
-      } else {
-        insertedCount += data?.length || 0;
+    for (const word of validWords) {
+      try {
+        await db
+          .prepare(`
+            INSERT INTO vocab_words (semester_id, word, phonetic, meaning, example_en, example_cn, "order")
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `)
+          .bind(
+            word.semester_id,
+            word.word,
+            word.phonetic,
+            word.meaning,
+            word.example_en,
+            word.example_cn,
+            word.order
+          )
+          .run();
+        
+        insertedCount++;
+      } catch (err) {
+        errors.push(`单词 "${word.word}": ${String(err)}`);
       }
     }
 
     return NextResponse.json({
       success: true,
-      semester: semester.name,
+      semester: (semester as any).name,
       imported: insertedCount,
       total: validWords.length,
       errors: errors.length > 0 ? errors : undefined
@@ -129,30 +136,23 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - 获取某分类的单词列表（管理员可看详情）
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const semesterId = searchParams.get('semesterId');
-    const adminUsername = searchParams.get('adminUsername');
 
     if (!semesterId) {
       return NextResponse.json({ error: 'semesterId is required' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
-    const { data, error } = await client
-      .from('vocab_words')
-      .select('*')
-      .eq('semester_id', parseInt(semesterId))
-      .order('order', { ascending: true });
+    const result = await db
+      .prepare('SELECT * FROM vocab_words WHERE semester_id = ? ORDER BY "order" ASC')
+      .bind(parseInt(semesterId))
+      .all();
 
-    if (error) {
-      console.error('Error fetching words:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ words: data, count: data?.length || 0 });
+    return NextResponse.json({ words: result.results, count: result.results.length });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -160,7 +160,7 @@ export async function GET(request: NextRequest) {
 }
 
 // DELETE - 删除某分类的所有单词（仅管理员）
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const semesterId = searchParams.get('semesterId');
@@ -174,30 +174,25 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'semesterId is required' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
     // 验证管理员权限
-    const adminCheck = await checkAdmin(client, adminUsername);
+    const adminCheck = await checkAdmin(db, adminUsername);
     if (!adminCheck.success) {
       return NextResponse.json({ error: adminCheck.error }, { status: 403 });
     }
 
     // 先删除相关进度
-    await client
-      .from('user_progress')
-      .delete()
-      .eq('semester_id', parseInt(semesterId));
+    await db
+      .prepare('DELETE FROM user_progress WHERE semester_id = ?')
+      .bind(parseInt(semesterId))
+      .run();
 
     // 再删除单词
-    const { error } = await client
-      .from('vocab_words')
-      .delete()
-      .eq('semester_id', parseInt(semesterId));
-
-    if (error) {
-      console.error('Error deleting words:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    await db
+      .prepare('DELETE FROM vocab_words WHERE semester_id = ?')
+      .bind(parseInt(semesterId))
+      .run();
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,8 +1,10 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // POST - 修改密码
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { username, currentPassword, newPassword } = body;
@@ -15,34 +17,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: '新密码至少需要4个字符' }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
     // 获取用户信息
-    const { data: user, error: fetchError } = await client
-      .from('users')
-      .select('*')
-      .eq('username', username)
-      .single();
+    const user = await db
+      .prepare('SELECT * FROM users WHERE username = ?')
+      .bind(username)
+      .first();
 
-    if (fetchError || !user) {
+    if (!user) {
       return NextResponse.json({ error: '用户不存在' }, { status: 404 });
     }
 
     // 验证当前密码
-    if (user.password && user.password !== currentPassword) {
+    if ((user as any).password && (user as any).password !== currentPassword) {
       return NextResponse.json({ error: '当前密码错误' }, { status: 401 });
     }
 
     // 更新密码
-    const { error: updateError } = await client
-      .from('users')
-      .update({ password: newPassword })
-      .eq('id', user.id);
-
-    if (updateError) {
-      console.error('Error updating password:', updateError);
-      return NextResponse.json({ error: '密码更新失败' }, { status: 500 });
-    }
+    await db
+      .prepare('UPDATE users SET password = ? WHERE id = ?')
+      .bind(newPassword, (user as any).id)
+      .run();
 
     return NextResponse.json({ success: true, message: '密码修改成功' });
   } catch (error) {

@@ -1,26 +1,36 @@
-# Cloudflare Workers 配置
-# 用于部署 Next.js 到 Cloudflare Pages/Workers
+# ============================================
+# Cloudflare Pages + D1 配置
+# 中考词汇通
+# ============================================
 
+# 项目名称（部署后在 Cloudflare 显示的名称）
 name = "vocab-app"
-main = ".worker-next/index.mjs"
+
+# 兼容日期
 compatibility_date = "2024-01-01"
+
+# Node.js 兼容标志
 compatibility_flags = ["nodejs_compat"]
 
-# 静态资源目录
-[site]
-bucket = ".worker-next/assets"
+# ============================================
+# D1 数据库绑定
+# 部署前需要先创建数据库：
+# wrangler d1 create vocab-db
+# 然后将返回的 database_id 填入下方
+# ============================================
+[[d1_databases]]
+binding = "DB"
+database_name = "vocab-db"
+database_id = "your-database-id-here"  # 替换为实际的 database_id
 
-# 环境变量（敏感信息请在 Dashboard 中配置）
-[vars]
-ENVIRONMENT = "production"
+# ============================================
+# Pages 项目配置
+# ============================================
+pages_build_output_dir = ".vercel/output/static"
 
-# 绑定 KV（如需要）
-# [[kv_namespaces]]
-# binding = "KV"
-# id = "xxx"
-
-# 绑定 D1 数据库（如使用 Cloudflare D1）
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "vocab-db"
-# database_id = "xxx"
+# ============================================
+# 环境变量（可选）
+# 如需添加环境变量，在 Cloudflare Dashboard 中配置
+# ============================================
+# [vars]
+# ENVIRONMENT = "production"

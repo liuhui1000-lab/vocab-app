@@ -1,9 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // POST - 批量导入单词
 // 格式: { semesterId: number, words: Array<{w, p, m, ex, exc}> }
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const body = await request.json();
     const { semesterId, words, clearExisting } = body;
@@ -14,14 +16,13 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
     // 验证学期是否存在
-    const { data: semester } = await client
-      .from('semesters')
-      .select('id, name')
-      .eq('id', semesterId)
-      .single();
+    const semester = await db
+      .prepare('SELECT id, name FROM semesters WHERE id = ?')
+      .bind(semesterId)
+      .first();
 
     if (!semester) {
       return NextResponse.json({ 
@@ -32,29 +33,27 @@ export async function POST(request: NextRequest) {
     // 如果需要，清空现有单词
     if (clearExisting) {
       // 先删除相关进度
-      await client
-        .from('user_progress')
-        .delete()
-        .eq('semester_id', semesterId);
+      await db
+        .prepare('DELETE FROM user_progress WHERE semester_id = ?')
+        .bind(semesterId)
+        .run();
       
       // 再删除单词
-      await client
-        .from('vocab_words')
-        .delete()
-        .eq('semester_id', semesterId);
+      await db
+        .prepare('DELETE FROM vocab_words WHERE semester_id = ?')
+        .bind(semesterId)
+        .run();
     }
 
     // 获取当前最大order
-    const { data: existingWords } = await client
-      .from('vocab_words')
-      .select('order')
-      .eq('semester_id', semesterId)
-      .order('order', { ascending: false })
-      .limit(1);
-
+    const maxOrderResult = await db
+      .prepare('SELECT MAX("order") as max_order FROM vocab_words WHERE semester_id = ?')
+      .bind(semesterId)
+      .first();
+    
     let startOrder = 0;
-    if (existingWords && existingWords.length > 0) {
-      startOrder = (existingWords[0].order || 0) + 1;
+    if (maxOrderResult && (maxOrderResult as any).max_order !== null) {
+      startOrder = (maxOrderResult as any).max_order + 1;
     }
 
     // 转换单词格式
@@ -77,28 +76,37 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    // 批量插入（每次最多100条）
-    const batchSize = 100;
+    // D1 不支持批量 INSERT，需要逐个插入
     let insertedCount = 0;
     const errors = [];
 
-    for (let i = 0; i < validWords.length; i += batchSize) {
-      const batch = validWords.slice(i, i + batchSize);
-      const { data, error } = await client
-        .from('vocab_words')
-        .insert(batch)
-        .select();
-
-      if (error) {
-        errors.push(`Batch ${Math.floor(i / batchSize) + 1}: ${error.message}`);
-      } else {
-        insertedCount += data?.length || 0;
+    for (const word of validWords) {
+      try {
+        await db
+          .prepare(`
+            INSERT INTO vocab_words (semester_id, word, phonetic, meaning, example_en, example_cn, "order")
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `)
+          .bind(
+            word.semester_id,
+            word.word,
+            word.phonetic,
+            word.meaning,
+            word.example_en,
+            word.example_cn,
+            word.order
+          )
+          .run();
+        
+        insertedCount++;
+      } catch (err) {
+        errors.push(`单词 "${word.word}": ${String(err)}`);
       }
     }
 
     return NextResponse.json({
       success: true,
-      semester: semester.name,
+      semester: (semester as any).name,
       imported: insertedCount,
       total: validWords.length,
       errors: errors.length > 0 ? errors : undefined
@@ -110,7 +118,7 @@ export async function POST(request: NextRequest) {
 }
 
 // GET - 获取某学期的单词列表
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const semesterId = searchParams.get('semesterId');
@@ -121,20 +129,14 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
-    const { data, error } = await client
-      .from('vocab_words')
-      .select('*')
-      .eq('semester_id', parseInt(semesterId))
-      .order('order', { ascending: true });
+    const result = await db
+      .prepare('SELECT * FROM vocab_words WHERE semester_id = ? ORDER BY "order" ASC')
+      .bind(parseInt(semesterId))
+      .all();
 
-    if (error) {
-      console.error('Error fetching words:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
-
-    return NextResponse.json({ words: data, count: data?.length || 0 });
+    return NextResponse.json({ words: result.results, count: result.results.length });
   } catch (error) {
     console.error('Error:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
@@ -142,7 +144,7 @@ export async function GET(request: NextRequest) {
 }
 
 // DELETE - 删除某学期的所有单词
-export async function DELETE(request: NextRequest) {
+export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const semesterId = searchParams.get('semesterId');
@@ -153,24 +155,19 @@ export async function DELETE(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const client = getSupabaseClient();
+    const db = getDB(request);
 
     // 先删除相关进度
-    await client
-      .from('user_progress')
-      .delete()
-      .eq('semester_id', parseInt(semesterId));
+    await db
+      .prepare('DELETE FROM user_progress WHERE semester_id = ?')
+      .bind(parseInt(semesterId))
+      .run();
 
     // 再删除单词
-    const { error } = await client
-      .from('vocab_words')
-      .delete()
-      .eq('semester_id', parseInt(semesterId));
-
-    if (error) {
-      console.error('Error deleting words:', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    await db
+      .prepare('DELETE FROM vocab_words WHERE semester_id = ?')
+      .bind(parseInt(semesterId))
+      .run();
 
     return NextResponse.json({ success: true });
   } catch (error) {

@@ -1,5 +1,7 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/storage/database/supabase-client';
+import { NextResponse } from 'next/server';
+import { getDB } from '@/lib/db-helpers';
+
+export const runtime = 'edge';
 
 // 新的学期分类
 const sampleSemesters = [
@@ -112,80 +114,74 @@ const sampleWords = [
 ];
 
 // POST - initialize sample data
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const client = getSupabaseClient();
+    const db = getDB(request);
     const body = await request.json().catch(() => ({}));
     const forceReset = body.forceReset === true;
 
     // Check if data already exists
-    const { data: existingSemesters } = await client
-      .from('semesters')
-      .select('id')
-      .limit(1);
+    const existingSemesters = await db
+      .prepare('SELECT id FROM semesters LIMIT 1')
+      .first();
 
-    if (existingSemesters && existingSemesters.length > 0 && !forceReset) {
+    if (existingSemesters && !forceReset) {
       return NextResponse.json({ 
         message: 'Data already initialized',
-        semesters: existingSemesters.length 
+        semesters: 1 
       });
     }
 
     // If force reset, delete old data
-    if (forceReset && existingSemesters && existingSemesters.length > 0) {
+    if (forceReset && existingSemesters) {
       // Delete in correct order (progress -> words -> semesters)
-      await client.from('study_stats').delete().neq('id', 0);
-      await client.from('user_progress').delete().neq('id', 0);
-      await client.from('vocab_words').delete().neq('id', 0);
-      await client.from('semesters').delete().neq('id', 0);
+      await db.prepare('DELETE FROM study_stats').run();
+      await db.prepare('DELETE FROM user_progress').run();
+      await db.prepare('DELETE FROM vocab_words').run();
+      await db.prepare('DELETE FROM semesters').run();
     }
 
     // Insert semesters
-    const { data: insertedSemesters, error: semesterError } = await client
-      .from('semesters')
-      .insert(sampleSemesters)
-      .select();
+    let semesterCount = 0;
+    const insertedSemesterIds: number[] = [];
 
-    if (semesterError) {
-      console.error('Error inserting semesters:', semesterError);
-      return NextResponse.json({ error: semesterError.message }, { status: 500 });
+    for (const semester of sampleSemesters) {
+      const result = await db
+        .prepare('INSERT INTO semesters (name, slug, description, "order", is_active) VALUES (?, ?, ?, ?, 1) RETURNING id')
+        .bind(semester.name, semester.slug, semester.description, semester.order)
+        .first();
+      
+      if (result) {
+        insertedSemesterIds.push((result as any).id);
+        semesterCount++;
+      }
     }
 
     // Insert words for each semester (15 words per semester)
     let wordCount = 0;
     const wordsPerSemester = 15;
     
-    for (let i = 0; i < insertedSemesters.length; i++) {
-      const semester = insertedSemesters[i];
+    for (let i = 0; i < insertedSemesterIds.length; i++) {
+      const semesterId = insertedSemesterIds[i];
       const startIndex = i * wordsPerSemester;
       const semesterWords = sampleWords.slice(startIndex, startIndex + wordsPerSemester);
 
-      if (semesterWords.length > 0) {
-        const wordsToInsert = semesterWords.map((w, idx) => ({
-          semester_id: semester.id,
-          word: w.word,
-          phonetic: w.phonetic,
-          meaning: w.meaning,
-          example_en: w.exampleEn,
-          example_cn: w.exampleCn,
-          order: idx,
-        }));
-
-        const { error: wordError } = await client
-          .from('vocab_words')
-          .insert(wordsToInsert);
-
-        if (wordError) {
-          console.error('Error inserting words:', wordError);
-        } else {
-          wordCount += wordsToInsert.length;
-        }
+      for (let idx = 0; idx < semesterWords.length; idx++) {
+        const w = semesterWords[idx];
+        await db
+          .prepare(`
+            INSERT INTO vocab_words (semester_id, word, phonetic, meaning, example_en, example_cn, "order")
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+          `)
+          .bind(semesterId, w.word, w.phonetic, w.meaning, w.exampleEn, w.exampleCn, idx)
+          .run();
+        wordCount++;
       }
     }
 
     return NextResponse.json({ 
       success: true, 
-      semesters: insertedSemesters.length,
+      semesters: semesterCount,
       words: wordCount 
     });
   } catch (error) {
