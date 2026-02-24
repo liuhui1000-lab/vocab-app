@@ -105,42 +105,21 @@ echo "=========================================="
 
 echo "Build completed successfully!"
 
-# 生成 _routes.json 文件，配置 Cloudflare Pages 的路由规则
-# 这确保静态资源由 Cloudflare 的静态资源服务器处理，而不是 worker
-echo "Generating _routes.json for Cloudflare Pages..."
-cat > .open-next/_routes.json << 'EOF'
+# 创建 _routes.json 配置静态资源路由
+# Cloudflare Pages 使用此文件决定哪些路径由 worker 处理，哪些直接返回静态文件
+echo "Creating _routes.json for static asset routing..."
+cat > .open-next/_routes.json << 'ROUTES_EOF'
 {
   "version": 1,
   "include": ["/*"],
   "exclude": [
-    "/_next/*",
+    "/_next/static/*",
     "/favicon.ico",
     "/*.svg",
     "/*.png",
     "/*.jpg",
-    "/*.jpeg",
-    "/*.gif",
-    "/*.webp",
-    "/*.ico",
-    "/*.woff",
-    "/*.woff2",
-    "/*.ttf",
-    "/*.eot",
-    "/*.js",
-    "/*.css"
+    "/*.ico"
   ]
 }
-EOF
+ROUTES_EOF
 echo "Created _routes.json"
-
-# 生成 _headers 文件，配置静态资源的缓存策略
-echo "Generating _headers for Cloudflare Pages..."
-cat > .open-next/_headers << 'EOF'
-/_next/*
-  Cache-Control: public, max-age=31536000, immutable
-EOF
-echo "Created _headers"
-
-# 创建测试文件验证静态资源部署
-echo "This is a test file to verify static asset deployment." > .open-next/test-static.txt
-echo "Created test-static.txt"

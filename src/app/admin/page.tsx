@@ -526,19 +526,20 @@ export default function AdminPage() {
                   <textarea
                     value={vocabJson}
                     onChange={(e) => setVocabJson(e.target.value)}
-                    placeholder={`JSON 数组格式，每个单词包含：
-
+                    placeholder={`字段说明：
 • w: 单词
 • p: 音标（可选）
 • m: 词性和释义
 • ex: 例句英文（可选）
 • exc: 例句中文（可选）
 
-示例：
+格式示例：
 [
-  { w: "after", p: "/ˈɑːftər/", m: "prep. 在…之后", ex: "We play football after school.", exc: "我们放学后踢足球。" },
-  { w: "always", p: "/ˈɔːlweɪz/", m: "adv. 总是", ex: "He is always late.", exc: "他总是迟到。" },
-  { w: "age", p: "/eɪdʒ/", m: "n. 年龄" }
+  { "w": "after", "p": "/ˈɑːftər/", "m": "prep. 在…之后", "ex": "We play football after school.", "exc": "我们放学后踢足球。" },
+  { "w": "after school", "p": "/'ɑ:ftə sku:l/", "m": "phr. 放学后", "ex": "I go home after school.", "exc": "我放学后回家。" },
+  { "w": "age", "p": "/eɪdʒ/", "m": "n. 年龄", "ex": "What is your age?", "exc": "你多大了？" },
+  { "w": "always", "p": "/ˈɔːlweɪz/", "m": "adv. 总是", "ex": "He is always late.", "exc": "他总是迟到。" },
+  { "w": "area", "p": "/ˈeəriə/", "m": "n. 地区", "ex": "This area is quiet.", "exc": "这个地区很安静。" }
 ]`}
                     className="w-full p-3 border rounded-lg h-64 font-mono text-sm"
                   />
