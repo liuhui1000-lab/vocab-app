@@ -132,3 +132,15 @@ cat > .open-next/_routes.json << 'EOF'
 }
 EOF
 echo "Created _routes.json"
+
+# 生成 _headers 文件，配置静态资源的缓存策略
+echo "Generating _headers for Cloudflare Pages..."
+cat > .open-next/_headers << 'EOF'
+/_next/*
+  Cache-Control: public, max-age=31536000, immutable
+EOF
+echo "Created _headers"
+
+# 创建测试文件验证静态资源部署
+echo "This is a test file to verify static asset deployment." > .open-next/test-static.txt
+echo "Created test-static.txt"
