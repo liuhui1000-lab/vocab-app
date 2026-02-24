@@ -17,8 +17,6 @@ const nextConfig = {
     serverActions: {
       bodySizeLimit: '2mb',
     },
-    // Disable turbopack for better compatibility
-    turbo: undefined,
   },
 };
 
