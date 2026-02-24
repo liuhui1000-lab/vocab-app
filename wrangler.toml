@@ -3,7 +3,7 @@
 # 中考词汇通
 # ============================================
 
-# 项目名称（部署后在 Cloudflare 显示的名称）
+# 项目名称
 name = "vocab-app"
 
 # 兼容日期
@@ -14,23 +14,14 @@ compatibility_flags = ["nodejs_compat"]
 
 # ============================================
 # D1 数据库绑定
-# 部署前需要先创建数据库：
-# wrangler d1 create vocab-db
-# 然后将返回的 database_id 填入下方
 # ============================================
 [[d1_databases]]
 binding = "DB"
 database_name = "vocab-app-db"
-database_id = "12fd5fec-39ad-4cf8-86cf-0df736b2179a"  # 替换为实际的 database_id
+database_id = "12fd5fec-39ad-4cf8-86cf-0df736b2179a"
 
 # ============================================
 # Pages 项目配置
 # ============================================
-pages_build_output_dir = ".vercel/output/static"
-
-# ============================================
-# 环境变量（可选）
-# 如需添加环境变量，在 Cloudflare Dashboard 中配置
-# ============================================
-# [vars]
-# ENVIRONMENT = "production"
+[assets]
+directory = ".next"
