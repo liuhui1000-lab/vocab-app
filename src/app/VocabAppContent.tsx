@@ -818,21 +818,34 @@ export function VocabAppContent() {
               </div>
               
               {/* Per-category breakdown */}
-              {stats.categoryStats && stats.categoryStats.length > 1 && (
+              {stats.categoryStats && stats.categoryStats.length >= 1 && (
                 <div className="mt-4 pt-4 border-t">
                   <div className="text-xs text-gray-500 mb-2">分类详情：</div>
                   <div className="space-y-2">
-                    {stats.categoryStats.map(cs => (
-                      <div key={cs.id} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-700">{cs.name}</span>
-                        <div className="flex gap-3 text-xs">
-                          <span>{cs.total}词</span>
-                          {cs.newCount > 0 && <span className="text-blue-500">新{cs.newCount}</span>}
-                          {cs.reviewCount > 0 && <span className="text-orange-500">复{cs.reviewCount}</span>}
-                          {cs.hardCount > 0 && <span className="text-red-500">难{cs.hardCount}</span>}
+                    {stats.categoryStats.map(cs => {
+                      const learned = cs.total - cs.newCount;
+                      const progress = cs.total > 0 ? Math.round((learned / cs.total) * 100) : 0;
+                      return (
+                        <div key={cs.id} className="bg-gray-50 rounded-lg p-2">
+                          <div className="flex items-center justify-between text-sm mb-1">
+                            <span className="font-medium text-gray-700">{cs.name}</span>
+                            <span className="text-xs text-gray-500">{progress}%</span>
+                          </div>
+                          <div className="h-1.5 bg-gray-200 rounded-full overflow-hidden mb-2">
+                            <div 
+                              className="h-full bg-blue-500 rounded-full"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          <div className="flex gap-2 text-xs flex-wrap">
+                            <span className="px-1.5 py-0.5 bg-gray-200 rounded">📚 {cs.total}</span>
+                            {cs.newCount > 0 && <span className="px-1.5 py-0.5 bg-blue-100 text-blue-600 rounded">📖 待学{cs.newCount}</span>}
+                            {cs.reviewCount > 0 && <span className="px-1.5 py-0.5 bg-orange-100 text-orange-600 rounded">⏰ 复习{cs.reviewCount}</span>}
+                            {cs.hardCount > 0 && <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded">💀 困难{cs.hardCount}</span>}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
