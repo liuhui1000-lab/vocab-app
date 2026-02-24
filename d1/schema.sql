@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS study_stats (
     new_count INTEGER NOT NULL DEFAULT 0,
     review_count INTEGER NOT NULL DEFAULT 0,
     created_at TEXT DEFAULT (datetime('now')),
-    FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE
+    FOREIGN KEY (semester_id) REFERENCES semesters(id) ON DELETE CASCADE,
+    UNIQUE(username, semester_id, date)
 );
 
 CREATE INDEX IF NOT EXISTS idx_stats_username ON study_stats(username);

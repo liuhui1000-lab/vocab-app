@@ -53,15 +53,20 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { username, semesterId, date, type } = body;
 
+    console.log('[API /stats POST] 收到请求:', body);
+
     if (!username || !semesterId || !date || !type) {
+      console.error('[API /stats POST] 参数无效:', body);
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
     const db = getDB();
     const updateField = type === 'new' ? 'new_count' : 'review_count';
 
+    console.log('[API /stats POST] 尝试 UPSERT:', { username, semesterId, date, type, updateField });
+
     // SQLite 的 UPSERT 语法
-    await db
+    const result = await db
       .prepare(`
         INSERT INTO study_stats (username, semester_id, date, new_count, review_count)
         VALUES (?, ?, ?, ?, ?)
@@ -77,9 +82,13 @@ export async function POST(request: Request) {
       )
       .run();
 
+    console.log('[API /stats POST] 结果:', result);
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    const errorDetails = error instanceof Error 
+      ? { message: error.message, stack: error.stack }
+      : { raw: String(error) };
+    console.error('[API /stats POST] 错误:', errorDetails);
+    return NextResponse.json({ error: 'Internal server error', details: errorDetails }, { status: 500 });
   }
 }

@@ -96,8 +96,11 @@ export async function POST(request: Request) {
         console.log('[API /progress POST] 保存结果:', result);
         results.push({ wordId: item.wordId, result });
       } catch (err) {
-        console.error('[API /progress POST] 保存错误:', err);
-        errors.push({ wordId: item.wordId, error: String(err) });
+        const errorDetails = err instanceof Error 
+          ? { message: err.message, stack: err.stack, name: err.name }
+          : { raw: String(err) };
+        console.error('[API /progress POST] 保存错误:', errorDetails);
+        errors.push({ wordId: item.wordId, item, error: errorDetails });
       }
     }
 
