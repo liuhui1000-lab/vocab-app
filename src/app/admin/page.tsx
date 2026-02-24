@@ -161,19 +161,92 @@ export default function AdminPage() {
     try {
       // 先尝试标准JSON解析
       words = JSON.parse(vocabJson);
-    } catch {
+    } catch (jsonError) {
       try {
         // 如果失败，尝试解析JavaScript对象格式（字段无引号）
-        // 使用Function构造函数安全执行
         words = new Function('return [' + vocabJson + ']')();
-      } catch {
-        showMessage('error', '格式错误，请检查数据格式');
+      } catch (jsError) {
+        // 提取错误位置信息
+        const jsonMsg = jsonError instanceof Error ? jsonError.message : String(jsonError);
+        const jsMsg = jsError instanceof Error ? jsError.message : String(jsError);
+        
+        // 尝试找出出错位置
+        let errorDetail = '';
+        
+        // 检查常见问题
+        const lines = vocabJson.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i];
+          const lineNum = i + 1;
+          
+          // 检查最后一个对象是否缺少闭合
+          const openBraces = (line.match(/\{/g) || []).length;
+          const closeBraces = (line.match(/\}/g) || []).length;
+          
+          // 检查引号是否匹配
+          const quotes = (line.match(/"/g) || []).length;
+          const singleQuotes = (line.match(/'/g) || []).length;
+          
+          // 检查常见语法错误
+          if (line.includes(',}') || line.includes(',]')) {
+            errorDetail = `第 ${lineNum} 行: 多余的逗号 → "${line.trim()}"`;
+            break;
+          }
+          if (line.includes('“') || line.includes('”')) {
+            errorDetail = `第 ${lineNum} 行: 使用了中文引号，请改为英文引号 → "${line.trim()}"`;
+            break;
+          }
+          if (line.includes('：') && !line.includes(':')) {
+            errorDetail = `第 ${lineNum} 行: 使用了中文冒号，请改为英文冒号 → "${line.trim()}"`;
+            break;
+          }
+          if (line.includes('，') && !line.includes(',')) {
+            errorDetail = `第 ${lineNum} 行: 使用了中文逗号，请改为英文逗号 → "${line.trim()}"`;
+            break;
+          }
+        }
+        
+        if (!errorDetail) {
+          // 尝试找出缺少闭合的位置
+          const openBraces = (vocabJson.match(/\{/g) || []).length;
+          const closeBraces = (vocabJson.match(/\}/g) || []).length;
+          const openBrackets = (vocabJson.match(/\[/g) || []).length;
+          const closeBrackets = (vocabJson.match(/\]/g) || []).length;
+          
+          if (openBraces !== closeBraces) {
+            errorDetail = `大括号不匹配: { 有 ${openBraces} 个, } 有 ${closeBraces} 个`;
+          } else if (openBrackets !== closeBrackets) {
+            errorDetail = `方括号不匹配: [ 有 ${openBrackets} 个, ] 有 ${closeBrackets} 个`;
+          } else {
+            errorDetail = `解析错误: ${jsonMsg}`;
+          }
+        }
+        
+        showMessage('error', `格式错误 - ${errorDetail}`);
         return;
       }
     }
 
+    // 验证数据
     if (!Array.isArray(words) || words.length === 0) {
       showMessage('error', '请输入有效的单词数组');
+      return;
+    }
+    
+    // 检查每个单词的必填字段
+    const invalidWords: string[] = [];
+    words.forEach((w: any, idx: number) => {
+      const word = w.w || w.word;
+      const meaning = w.m || w.meaning;
+      if (!word || !meaning) {
+        invalidWords.push(`第${idx + 1}个: ${word || '(缺少单词)'}`);
+      }
+    });
+    
+    if (invalidWords.length > 0) {
+      const examples = invalidWords.slice(0, 5).join(', ');
+      const more = invalidWords.length > 5 ? ` 等${invalidWords.length}个` : '';
+      showMessage('error', `缺少必填字段(单词或释义): ${examples}${more}`);
       return;
     }
 
