@@ -616,13 +616,29 @@ export function VocabAppContent() {
 
     setUnsavedCount(c => c + 1);
     
-    // 更新本地 sessionWords 中的 progress.state，确保 nextCard 能正确判断
+    // 更新本地 sessionWords 中的 progress，确保 finishSession 能保存完整数据
     setSessionWords(prev => {
       const updated = prev.map(w => {
         if (w.id === word.id) {
+          const newProgress = {
+            ...w.progress,
+            id: w.progress?.id ?? 0,
+            username: w.progress?.username ?? username,
+            word_id: w.id,
+            semester_id: w.semester_id,
+            state: newState,
+            ef,
+            interval,
+            next_review: nextReview.toISOString(),
+            failure_count: success ? (w.progress?.failure_count ?? 0) : (w.progress?.failure_count ?? 0) + 1,
+            penalty_progress: 0,
+            in_penalty: !success,
+            created_at: w.progress?.created_at ?? new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
           return {
             ...w,
-            progress: w.progress ? { ...w.progress, state: newState } : undefined,
+            progress: newProgress as UserProgress,
           };
         }
         return w;
@@ -638,18 +654,25 @@ export function VocabAppContent() {
   };
 
   const finishSession = async () => {
-    if (unsavedCount > 0) {
-      const progressToSave = sessionWords.map(w => ({
+    // 使用 ref 获取最新的 sessionWords 数据
+    const currentSessionWords = sessionWordsRef.current;
+    
+    // 找出所有有进度更新的单词（包括新学的和已复习的）
+    const progressToSave = currentSessionWords
+      .filter(w => w.progress && w.progress.state !== 'new')
+      .map(w => ({
         wordId: w.id,
         semesterId: w.semester_id,
-        state: w.progress?.state ?? 'new',
-        nextReview: w.progress?.next_review,
-        ef: w.progress?.ef ?? 25,
-        interval: w.progress?.interval ?? 0,
-        failureCount: w.progress?.failure_count ?? 0,
+        state: w.progress!.state,
+        nextReview: w.progress!.next_review,
+        ef: w.progress!.ef ?? 25,
+        interval: w.progress!.interval ?? 0,
+        failureCount: w.progress!.failure_count ?? 0,
         penaltyProgress: 0,
         inPenalty: false,
       }));
+    
+    if (progressToSave.length > 0) {
       await saveProgress(username, progressToSave);
       setUnsavedCount(0);
     }
