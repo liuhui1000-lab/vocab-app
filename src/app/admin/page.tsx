@@ -526,17 +526,19 @@ export default function AdminPage() {
                   <textarea
                     value={vocabJson}
                     onChange={(e) => setVocabJson(e.target.value)}
-                    placeholder={`支持两种格式：
+                    placeholder={`JSON 数组格式，每个单词包含：
 
-格式1（简写）：
-[
-  {"w": "apple", "p": "/ˈæpl/", "m": "n. 苹果", "ex": "I eat an apple.", "exc": "我吃苹果。"},
-  {"w": "book", "p": "/bʊk/", "m": "n. 书"}
-]
+• w: 单词
+• p: 音标（可选）
+• m: 词性和释义
+• ex: 例句英文（可选）
+• exc: 例句中文（可选）
 
-格式2（完整）：
+示例：
 [
-  {"word": "apple", "phonetic": "/ˈæpl/", "meaning": "n. 苹果", "exampleEn": "I eat an apple.", "exampleCn": "我吃苹果。"}
+  { w: "after", p: "/ˈɑːftər/", m: "prep. 在…之后", ex: "We play football after school.", exc: "我们放学后踢足球。" },
+  { w: "always", p: "/ˈɔːlweɪz/", m: "adv. 总是", ex: "He is always late.", exc: "他总是迟到。" },
+  { w: "age", p: "/eɪdʒ/", m: "n. 年龄" }
 ]`}
                     className="w-full p-3 border rounded-lg h-64 font-mono text-sm"
                   />
