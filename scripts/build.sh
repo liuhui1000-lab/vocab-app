@@ -15,6 +15,12 @@ cd "${COZE_WORKSPACE_PATH:-$(pwd)}"
 export OPENNEXT_BUILD=1
 npx opennextjs-cloudflare build
 
+# 重命名 worker.js 为 _worker.js（Cloudflare Pages 入口文件名要求）
+if [ -f ".open-next/worker.js" ]; then
+  mv .open-next/worker.js .open-next/_worker.js
+  echo "Renamed worker.js to _worker.js for Cloudflare Pages"
+fi
+
 # 修复符号链接问题：Cloudflare Pages 无法访问指向输出目录外的链接
 echo "Resolving symlinks for Cloudflare Pages compatibility..."
 if [ -d ".open-next" ]; then
@@ -39,12 +45,10 @@ if [ -d ".open-next" ]; then
         else
           cp "$abs_target" "$link"
         fi
-        echo "Resolved: $link -> $abs_target"
+        echo "Resolved: $link"
       else
         # 目标在 .open-next 外，尝试从项目 node_modules 复制
-        # 提取包名和路径
         if [[ "$target" == .pnpm/* ]] || [[ "$target" == ../.pnpm/* ]]; then
-          # 构建到项目 node_modules 的路径
           pkg_path="$PROJECT_ROOT/node_modules/$target"
           if [ -e "$pkg_path" ]; then
             rm "$link"
@@ -54,8 +58,6 @@ if [ -d ".open-next" ]; then
               cp "$pkg_path" "$link"
             fi
             echo "Resolved from project node_modules: $link"
-          else
-            echo "Warning: Could not resolve symlink: $link -> $target"
           fi
         fi
       fi
