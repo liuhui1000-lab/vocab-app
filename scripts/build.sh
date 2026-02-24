@@ -16,9 +16,20 @@ export OPENNEXT_BUILD=1
 npx opennextjs-cloudflare build
 
 # 重命名 worker.js 为 _worker.js（Cloudflare Pages 入口文件名要求）
+# 同时删除原始文件避免重复
 if [ -f ".open-next/worker.js" ]; then
   mv .open-next/worker.js .open-next/_worker.js
   echo "Renamed worker.js to _worker.js for Cloudflare Pages"
+fi
+# 确保没有重复的 _worker.js
+rm -f .open-next/worker.js 2>/dev/null || true
+
+# 将 assets 目录内容移动到 .open-next 根目录（Cloudflare Pages 需要静态文件在根目录）
+echo "Moving assets to root for Cloudflare Pages..."
+if [ -d ".open-next/assets" ]; then
+  # 移动 assets 内容到父目录
+  cp -r .open-next/assets/* .open-next/ 2>/dev/null || true
+  echo "Assets moved to .open-next root"
 fi
 
 # 修复符号链接问题：Cloudflare Pages 无法访问指向输出目录外的链接
@@ -68,5 +79,12 @@ if [ -d ".open-next" ]; then
   remaining=$(find .open-next -type l | wc -l)
   echo "Symlinks resolved. Remaining: $remaining"
 fi
+
+# 列出最终输出目录结构
+echo "Final .open-next structure:"
+ls -la .open-next/
+echo ""
+echo "Static chunks:"
+ls -la .open-next/_next/static/chunks/ 2>/dev/null || echo "No chunks directory"
 
 echo "Build completed successfully!"
