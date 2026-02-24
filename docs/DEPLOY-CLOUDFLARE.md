@@ -28,27 +28,16 @@ wrangler login
 wrangler d1 create vocab-app-db
 ```
 
-执行后会返回数据库 ID：
-```
-✅ Successfully created DB 'vocab-app-db'
-[[d1_databases]]
-binding = "DB"
-database_name = "vocab-app-db"
-database_id = "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-```
+执行后会返回数据库 ID，记下这个 ID。
 
 ### 2. 更新 wrangler.toml
 将返回的 `database_id` 填入 `wrangler.toml` 文件：
 
 ```toml
 name = "vocab-app"
-main = ".open-next/worker.js"
 compatibility_date = "2024-01-01"
 compatibility_flags = ["nodejs_compat"]
-
-[assets]
-directory = ".open-next/assets"
-binding = "ASSETS"
+pages_build_output_dir = ".open-next"
 
 [[d1_databases]]
 binding = "DB"
@@ -60,18 +49,12 @@ database_id = "你的数据库ID"
 
 ### 1. 执行初始化脚本（创建表结构）
 ```bash
-# 远程执行（生产环境）
 wrangler d1 execute vocab-app-db --remote --file=./d1/schema.sql
 ```
 
 ### 2. 验证表创建成功
 ```bash
 wrangler d1 execute vocab-app-db --remote --command="SELECT name FROM sqlite_master WHERE type='table';"
-```
-
-应该看到：
-```
-["users", "semesters", "vocab_words", "user_progress", "study_stats"]
 ```
 
 ## 四、部署到 Cloudflare Pages
@@ -87,26 +70,30 @@ wrangler d1 execute vocab-app-db --remote --command="SELECT name FROM sqlite_mas
 
 3. **配置构建设置**
    - 框架预设：Next.js
-   - 构建命令：`pnpm run build:cf`
+   - 构建命令：`pnpm run build`
    - 构建输出目录：`.open-next`
 
-4. **绑定 D1 数据库**
+4. **绑定 D1 数据库（重要！）**
    - 部署完成后，进入项目设置 → Functions → D1 database bindings
    - 添加绑定：
      - Variable name: `DB`
      - D1 database: 选择之前创建的 `vocab-app-db`
+   
+5. **设置兼容性标志**
+   - 进入项目设置 → Functions → Compatibility flags
+   - 添加 `nodejs_compat` 标志
 
-5. **重新部署**
+6. **重新部署**
    - 绑定数据库后，需要重新部署一次才能生效
 
 ### 方式二：通过 CLI 部署
 
 ```bash
-# 构建（使用 OpenNext）
-pnpm run build:cf
+# 构建
+pnpm run build
 
 # 部署
-pnpm run deploy:cf
+npx wrangler pages deploy .open-next --project-name=vocab-app
 ```
 
 然后在 Dashboard 中绑定 D1 数据库。
@@ -119,64 +106,37 @@ pnpm run deploy:cf
 curl -X POST https://你的域名.pages.dev/api/init-data
 ```
 
-或者使用 `forceReset: true` 重置数据：
-```bash
-curl -X POST https://你的域名.pages.dev/api/init-data \
-  -H "Content-Type: application/json" \
-  -d '{"forceReset": true}'
-```
-
 这会创建：
 - 6 个学期分类（六年级、七年级、八年级上、八年级下、九年级上、九年级下）
 - 每个分类 15 个示例单词（共 90 个单词）
 
 ## 六、创建管理员账户
 
-### 方法一：直接操作数据库
 ```bash
 wrangler d1 execute vocab-app-db --remote --command="INSERT INTO users (username, password, is_admin) VALUES ('admin', 'admin123', 1);"
 ```
 
-### 方法二：通过 API
-首次访问应用时，输入任意用户名会自动创建普通用户。然后通过数据库将该用户设为管理员：
-```bash
-wrangler d1 execute vocab-app-db --remote --command="UPDATE users SET is_admin = 1 WHERE username = '你的用户名';"
-```
+## 七、常见问题
 
-## 七、本地开发
+### Q: 部署后访问页面显示 404
 
-### 使用 Wrangler 本地开发
-```bash
-# 构建
-pnpm run build:cf
+1. 检查 D1 数据库是否正确绑定
+2. 检查 `nodejs_compat` 兼容性标志是否添加
+3. 查看函数日志排查错误
 
-# 本地预览（带 D1）
-pnpm run preview:cf
-```
+### Q: API 返回 500 错误
 
-### 初始化本地数据库
-```bash
-wrangler d1 execute vocab-app-db --local --file=./d1/schema.sql
-wrangler d1 execute vocab-app-db --local --command="INSERT INTO users (username, password, is_admin) VALUES ('admin', 'admin123', 1);"
-```
+1. 检查 D1 数据库绑定是否正确
+2. 检查数据库表是否已创建
+3. 查看函数日志：Dashboard → Pages → 项目 → Functions → Logs
 
-## 八、常用命令
+### Q: 构建失败
 
-```bash
-# 查看所有用户
-wrangler d1 execute vocab-app-db --remote --command="SELECT id, username, is_admin FROM users;"
+1. 确保 Node.js 版本 >= 18
+2. 使用 pnpm 作为包管理器
+3. 检查 `open-next.config.ts` 配置是否正确
 
-# 查看单词统计
-wrangler d1 execute vocab-app-db --remote --command="SELECT semester_id, COUNT(*) as count FROM vocab_words GROUP BY semester_id;"
-
-# 查看进度统计
-wrangler d1 execute vocab-app-db --remote --command="SELECT COUNT(*) FROM user_progress;"
-
-# 备份数据库
-wrangler d1 export vocab-app-db --remote --output=backup.sql
-```
-
-## 九、费用说明
+## 八、费用说明
 
 Cloudflare D1 免费额度：
 - 存储：5GB
@@ -188,17 +148,3 @@ Cloudflare Pages 免费额度：
 - 无限带宽
 
 完全足够中小型单词应用使用。
-
-## 十、故障排除
-
-### API 返回 500 错误
-
-1. 检查 D1 数据库绑定是否正确
-2. 检查数据库表是否已创建
-3. 查看函数日志：Dashboard → Pages → 项目 → Functions → Logs
-
-### 构建失败
-
-1. 确保 Node.js 版本 >= 18
-2. 使用 pnpm 作为包管理器
-3. 检查 `open-next.config.ts` 配置是否正确
