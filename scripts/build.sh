@@ -14,3 +14,57 @@ echo "Building with OpenNext for Cloudflare Pages..."
 cd "${COZE_WORKSPACE_PATH:-$(pwd)}"
 export OPENNEXT_BUILD=1
 npx opennextjs-cloudflare build
+
+# 修复符号链接问题：Cloudflare Pages 无法访问指向输出目录外的链接
+echo "Resolving symlinks for Cloudflare Pages compatibility..."
+if [ -d ".open-next" ]; then
+  # 记录当前目录
+  PROJECT_ROOT=$(pwd)
+  
+  # 查找所有符号链接
+  find .open-next -type l | while read -r link; do
+    if [ -L "$link" ]; then
+      # 获取链接的目标（相对路径）
+      target=$(readlink "$link")
+      link_dir=$(dirname "$link")
+      
+      # 解析为绝对路径
+      abs_target=$(cd "$link_dir" && realpath -m "$target" 2>/dev/null || echo "")
+      
+      # 如果目标在 .open-next 目录内且存在，直接复制
+      if [[ -n "$abs_target" && -e "$abs_target" ]]; then
+        rm "$link"
+        if [ -d "$abs_target" ]; then
+          cp -r "$abs_target" "$link"
+        else
+          cp "$abs_target" "$link"
+        fi
+        echo "Resolved: $link -> $abs_target"
+      else
+        # 目标在 .open-next 外，尝试从项目 node_modules 复制
+        # 提取包名和路径
+        if [[ "$target" == .pnpm/* ]] || [[ "$target" == ../.pnpm/* ]]; then
+          # 构建到项目 node_modules 的路径
+          pkg_path="$PROJECT_ROOT/node_modules/$target"
+          if [ -e "$pkg_path" ]; then
+            rm "$link"
+            if [ -d "$pkg_path" ]; then
+              cp -r "$pkg_path" "$link"
+            else
+              cp "$pkg_path" "$link"
+            fi
+            echo "Resolved from project node_modules: $link"
+          else
+            echo "Warning: Could not resolve symlink: $link -> $target"
+          fi
+        fi
+      fi
+    fi
+  done
+  
+  # 统计剩余的符号链接
+  remaining=$(find .open-next -type l | wc -l)
+  echo "Symlinks resolved. Remaining: $remaining"
+fi
+
+echo "Build completed successfully!"
