@@ -113,7 +113,7 @@ cat > .open-next/_routes.json << 'EOF'
   "version": 1,
   "include": ["/*"],
   "exclude": [
-    "/_next/static/*",
+    "/_next/*",
     "/favicon.ico",
     "/*.svg",
     "/*.png",
@@ -125,7 +125,9 @@ cat > .open-next/_routes.json << 'EOF'
     "/*.woff",
     "/*.woff2",
     "/*.ttf",
-    "/*.eot"
+    "/*.eot",
+    "/*.js",
+    "/*.css"
   ]
 }
 EOF
