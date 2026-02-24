@@ -1,35 +1,75 @@
 import { NextResponse } from 'next/server';
-import { getDB, getSemesters } from '@/lib/db-helpers';
 
 export const runtime = 'edge';
 
 export async function GET(request: Request) {
   try {
-    const db = getDB(request);
-    const semesters = await getSemesters(db);
+    // 测试：直接返回成功，确认路由工作
+    const testResult = {
+      message: 'API is working',
+      hasEnv: typeof (request as any).env !== 'undefined',
+      hasGlobalDB: typeof (globalThis as any).DB !== 'undefined',
+    };
     
-    return NextResponse.json({ 
-      semesters: semesters.map(s => ({
-        ...s,
-        is_active: s.is_active === 1  // 转换为布尔值
-      }))
-    });
-  } catch (error) {
-    console.error('Error fetching semesters:', error);
+    // 尝试获取数据库
+    let db = null;
+    let dbSource = '';
     
-    // 本地开发时的后备数据
-    if (error instanceof Error && error.message.includes('not available')) {
-      return NextResponse.json({
-        semesters: [
-          { id: 1, name: '七年级上册', slug: 'grade7-1', description: '七年级上学期词汇', order: 1, is_active: true },
-          { id: 2, name: '七年级下册', slug: 'grade7-2', description: '七年级下学期词汇', order: 2, is_active: true },
-          { id: 3, name: '八年级上册', slug: 'grade8-1', description: '八年级上学期词汇', order: 3, is_active: true },
-          { id: 4, name: '八年级下册', slug: 'grade8-2', description: '八年级下学期词汇', order: 4, is_active: true },
-          { id: 5, name: '九年级全册', slug: 'grade9', description: '九年级全册词汇', order: 5, is_active: true },
-        ]
-      });
+    // 方式1: getRequestContext
+    try {
+      if (typeof (globalThis as any).getRequestContext !== 'undefined') {
+        const ctx = (globalThis as any).getRequestContext();
+        if (ctx?.env?.DB) {
+          db = ctx.env.DB;
+          dbSource = 'getRequestContext';
+        }
+      }
+    } catch (e) {
+      // ignore
     }
     
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    // 方式2: request.env
+    if (!db && (request as any).env?.DB) {
+      db = (request as any).env.DB;
+      dbSource = 'request.env';
+    }
+    
+    // 方式3: globalThis
+    if (!db && (globalThis as any).DB) {
+      db = (globalThis as any).DB;
+      dbSource = 'globalThis';
+    }
+    
+    if (!db) {
+      return NextResponse.json({ 
+        error: 'D1 database not found',
+        debug: testResult,
+        hint: 'Please check D1 binding in Cloudflare Pages Settings > Functions > D1 database bindings'
+      }, { status: 500 });
+    }
+    
+    // 测试查询
+    const result = await db
+      .prepare('SELECT * FROM semesters WHERE is_active = 1 ORDER BY "order" ASC')
+      .all();
+    
+    return NextResponse.json({ 
+      semesters: result.results.map((s: any) => ({
+        ...s,
+        is_active: s.is_active === 1
+      })),
+      debug: {
+        ...testResult,
+        dbSource,
+        rowCount: result.results.length
+      }
+    });
+  } catch (error) {
+    console.error('Error in semesters API:', error);
+    return NextResponse.json({ 
+      error: 'Internal server error',
+      message: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined
+    }, { status: 500 });
   }
 }
