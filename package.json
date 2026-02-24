@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
-    "build:cf": "npx opennextjs-cloudflare build",
+    "build": "bash ./scripts/build.sh",
+    "build:cf": "bash ./scripts/build.sh",
     "preview:cf": "npx opennextjs-cloudflare preview",
     "deploy:cf": "npx opennextjs-cloudflare deploy",
     "dev": "bash ./scripts/dev.sh",
