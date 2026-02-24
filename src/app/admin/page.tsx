@@ -151,142 +151,91 @@ export default function AdminPage() {
   };
 
   // ==================== 单词导入 ====================
+  // ==================== 单词导入 ====================
   const handleImportVocab = async () => {
     if (!selectedSemester) {
       showMessage('error', '请选择分类');
       return;
     }
 
-    let words;
-    let jsonStr = vocabJson.trim();
+    // 逐行解析，精确定位错误
+    const lines = vocabJson.trim().split('\n').filter(l => l.trim());
+    const words: any[] = [];
     
-    // 自动补全方括号（如果用户只粘贴了对象列表）
-    if (!jsonStr.startsWith('[')) {
-      jsonStr = '[' + jsonStr;
-    }
-    if (!jsonStr.endsWith(']')) {
-      // 移除末尾可能的逗号
-      jsonStr = jsonStr.replace(/,\s*$/, '');
-      jsonStr = jsonStr + ']';
-    }
-
-    try {
-      // 先尝试标准JSON解析
-      words = JSON.parse(jsonStr);
-    } catch (jsonError) {
-      try {
-        // 如果失败，尝试解析JavaScript对象格式（字段无引号）
-        words = new Function('return ' + jsonStr)();
-      } catch (jsError) {
-        // 提取错误位置
-        const jsMsg = jsError instanceof Error ? jsError.message : String(jsError);
-        
-        // 尝试定位具体错误
-        let errorDetail = '';
-        const lines = jsonStr.split('\n');
-        
-        // 从错误信息中提取位置
-        const posMatch = jsMsg.match(/line (\d+)/i);
-        if (posMatch) {
-          const lineNum = parseInt(posMatch[1]);
-          const actualLine = lines[lineNum - 1];
-          if (actualLine) {
-            errorDetail = `第 ${lineNum} 行附近有问题:\n"${actualLine.trim().substring(0, 60)}${actualLine.length > 60 ? '...' : ''}"`;
+    // 第一步：检查重复字段等常见问题
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineNum = i + 1;
+      
+      // 检查重复字段
+      const fieldMatches = line.match(/\b(w|p|m|ex|exc)\s*:/g);
+      if (fieldMatches) {
+        const fieldCounts: Record<string, number> = {};
+        fieldMatches.forEach(f => {
+          const fieldName = f.replace(/\s*:/, '').trim();
+          fieldCounts[fieldName] = (fieldCounts[fieldName] || 0) + 1;
+        });
+        for (const [field, count] of Object.entries(fieldCounts)) {
+          if (count > 1) {
+            showMessage('error', '第 ' + lineNum + ' 行错误: 字段 "' + field + '" 重复出现\n\n' + line.trim());
+            return;
           }
         }
-        
-        // 检查常见问题
-        if (!errorDetail) {
-          for (let i = 0; i < lines.length; i++) {
-            const line = lines[i];
-            const lineNum = i + 1;
-            
-            // 检查重复字段（如两个 ex:）
-            const fieldMatches = line.match(/\b(w|p|m|ex|exc|word|phonetic|meaning|exampleEn|exampleCn)\s*:/g);
-            if (fieldMatches) {
-              const fieldCounts: Record<string, number> = {};
-              fieldMatches.forEach(f => {
-                const fieldName = f.replace(/\s*:/, '').trim();
-                fieldCounts[fieldName] = (fieldCounts[fieldName] || 0) + 1;
-              });
-              for (const [field, count] of Object.entries(fieldCounts)) {
-                if (count > 1) {
-                  errorDetail = `第 ${lineNum} 行: 字段 "${field}" 重复出现\n"${line.trim()}"`;
-                  break;
-                }
-              }
-              if (errorDetail) break;
-            }
-            
-            if (line.includes('“') || line.includes('”')) {
-              errorDetail = `第 ${lineNum} 行: 发现中文引号 ""，请改为英文引号 ""`;
-              break;
-            }
-            if (line.includes('：') && !line.includes(':')) {
-              errorDetail = `第 ${lineNum} 行: 发现中文冒号，请改为英文冒号 :`;
-              break;
-            }
-            if (line.includes('，') && !line.includes(',')) {
-              errorDetail = `第 ${lineNum} 行: 发现中文逗号，请改为英文逗号 ,`;
-              break;
-            }
-            if (/, *\}/.test(line) || /, *\]/.test(line)) {
-              errorDetail = `第 ${lineNum} 行: 最后一个元素后多了逗号，请删除`;
-              break;
-            }
-          }
-        }
-        
-        // 检查括号匹配
-        if (!errorDetail) {
-          const openBraces = (jsonStr.match(/\{/g) || []).length;
-          const closeBraces = (jsonStr.match(/\}/g) || []).length;
-          const openBrackets = (jsonStr.match(/\[/g) || []).length;
-          const closeBrackets = (jsonStr.match(/\]/g) || []).length;
-          
-          if (openBraces !== closeBraces) {
-            const diff = openBraces - closeBraces;
-            errorDetail = `大括号数量不匹配: 少了 ${Math.abs(diff)} 个 "${diff > 0 ? '}' : '{'}"`;
-          } else if (openBrackets !== closeBrackets) {
-            const diff = openBrackets - closeBrackets;
-            errorDetail = `方括号数量不匹配: 少了 ${Math.abs(diff)} 个 "${diff > 0 ? ']' : '['}"`;
-          }
-        }
-        
-        if (!errorDetail) {
-          // 提取更友好的错误信息
-          if (jsMsg.includes('Unexpected')) {
-            errorDetail = '语法格式有误，请检查是否有多余符号或缺少引号';
-          } else {
-            errorDetail = jsMsg.substring(0, 100);
-          }
-        }
-        
-        showMessage('error', `导入失败: ${errorDetail}`);
+      }
+      
+      // 检查中文引号
+      if (line.includes('"') || line.includes('"')) {
+        showMessage('error', '第 ' + lineNum + ' 行错误: 发现中文引号，请改为英文引号\n\n' + line.trim());
         return;
       }
     }
+    
+    // 第二步：逐行解析
+    const errors: string[] = [];
+    
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const lineNum = i + 1;
+      
+      // 清理行尾逗号
+      let cleanLine = line.trim().replace(/,\s*$/, '');
+      
+      // 跳过数组括号
+      if (cleanLine === '[' || cleanLine === ']') continue;
+      if (!cleanLine.startsWith('{')) continue;
+      
+      try {
+        const obj = new Function('return ' + cleanLine)();
+        if (obj && typeof obj === 'object') {
+          words.push(obj);
+        }
+      } catch (e) {
+        errors.push('第 ' + lineNum + ' 行: ' + (e as Error).message + '\n"' + line.trim().substring(0, 70) + '..."');
+      }
+    }
+    
+    if (errors.length > 0) {
+      showMessage('error', '解析失败:\n\n' + errors.slice(0, 2).join('\n\n') + (errors.length > 2 ? '\n\n...还有 ' + (errors.length - 2) + ' 个错误' : ''));
+      return;
+    }
 
-    // 验证数据
-    if (!Array.isArray(words) || words.length === 0) {
-      showMessage('error', '请输入有效的单词数组');
+    if (words.length === 0) {
+      showMessage('error', '没有找到有效的单词数据');
       return;
     }
     
-    // 检查每个单词的必填字段
+    // 检查必填字段
     const invalidWords: string[] = [];
     words.forEach((w: any, idx: number) => {
       const word = w.w || w.word;
       const meaning = w.m || w.meaning;
       if (!word || !meaning) {
-        invalidWords.push(`第${idx + 1}个: ${word || '(缺少单词)'}`);
+        invalidWords.push('第' + (idx + 1) + '个: ' + (word || '(缺少单词)'));
       }
     });
     
     if (invalidWords.length > 0) {
-      const examples = invalidWords.slice(0, 5).join(', ');
-      const more = invalidWords.length > 5 ? ` 等${invalidWords.length}个` : '';
-      showMessage('error', `缺少必填字段(单词或释义): ${examples}${more}`);
+      showMessage('error', '缺少必填字段: ' + invalidWords.slice(0, 3).join(', ') + (invalidWords.length > 3 ? '...' : ''));
       return;
     }
 
