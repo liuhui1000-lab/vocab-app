@@ -94,6 +94,7 @@ export function VocabAppContent() {
   const [sessionType, setSessionType] = useState<'normal' | 'extra'>('normal');
   const [dailyLimit, setDailyLimit] = useState(20);
   const [unsavedCount, setUnsavedCount] = useState(0);
+  const unsavedCountRef = useRef(0);  // 添加 ref 追踪最新值
   const [spellResult, setSpellResult] = useState<{ correct: boolean; needMore?: number; completed?: boolean } | null>(null);
 
   // 同步 ref
@@ -108,6 +109,29 @@ export function VocabAppContent() {
   useEffect(() => {
     currentWordRef.current = currentWord;
   }, [currentWord]);
+
+  useEffect(() => {
+    unsavedCountRef.current = unsavedCount;
+  }, [unsavedCount]);
+
+  // 当用户返回 setup 页面时，重新获取进度数据
+  useEffect(() => {
+    async function refreshProgress() {
+      if (currentView === 'setup' && isLoggedIn && username && selectedSemesterIds.length > 0) {
+        try {
+          const progressData = await fetchProgress(username, selectedSemesterIds);
+          const progressMap = new Map(progressData.map(p => [p.word_id, p]));
+          setAllWords(prev => prev.map(w => ({
+            ...w,
+            progress: progressMap.get(w.id),
+          })));
+        } catch (error) {
+          console.error('Refresh progress error:', error);
+        }
+      }
+    }
+    refreshProgress();
+  }, [currentView, isLoggedIn, username]);
 
   // 初始化 - 检查本地存储的用户名
   useEffect(() => {
@@ -614,7 +638,10 @@ export function VocabAppContent() {
       inPenalty: !success,
     };
 
-    setUnsavedCount(c => c + 1);
+    // 使用函数式更新确保计数正确
+    const newCount = unsavedCountRef.current + 1;
+    setUnsavedCount(newCount);
+    unsavedCountRef.current = newCount;  // 立即同步 ref
     
     // 更新本地 sessionWords 中的 progress，确保 finishSession 能保存完整数据
     setSessionWords(prev => {
@@ -647,9 +674,11 @@ export function VocabAppContent() {
       return updated;
     });
     
-    if (unsavedCount >= 4) {
+    // 使用 ref 检查，确保使用最新值
+    if (newCount >= 4) {
       await saveProgress(username, [progressUpdate]);
       setUnsavedCount(0);
+      unsavedCountRef.current = 0;
     }
   };
 
@@ -675,6 +704,7 @@ export function VocabAppContent() {
     if (progressToSave.length > 0) {
       await saveProgress(username, progressToSave);
       setUnsavedCount(0);
+      unsavedCountRef.current = 0;
     }
 
     if (selectedSemesterIds.length > 0) {

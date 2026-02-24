@@ -1,3 +1,8 @@
+const { initOpenNextCloudflareForDev } = require('@opennextjs/cloudflare');
+
+// 初始化 OpenNext Cloudflare 开发环境支持
+initOpenNextCloudflareForDev();
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   allowedDevOrigins: ['*.dev.coze.site'],
