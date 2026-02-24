@@ -8,7 +8,7 @@ cd "${COZE_WORKSPACE_PATH}"
 echo "Installing dependencies..."
 pnpm install --prefer-frozen-lockfile --prefer-offline
 
-echo "Building for Cloudflare Pages..."
-npx @cloudflare/next-on-pages
+echo "Building Next.js application..."
+pnpm run next-build
 
 echo "Build completed successfully!"
