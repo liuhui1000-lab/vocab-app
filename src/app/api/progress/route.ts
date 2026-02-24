@@ -48,7 +48,14 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { username, progress } = body;
 
+    console.log('[API /progress POST] 收到请求:', { 
+      username, 
+      progressCount: progress?.length,
+      progress 
+    });
+
     if (!username || !progress || !Array.isArray(progress)) {
+      console.error('[API /progress POST] 参数无效:', { username, progress });
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
     }
 
@@ -58,7 +65,9 @@ export async function POST(request: Request) {
 
     for (const item of progress) {
       try {
-        await db
+        console.log('[API /progress POST] 保存项目:', item);
+        
+        const result = await db
           .prepare(`
             INSERT INTO user_progress (username, word_id, semester_id, state, next_review, ef, "interval", failure_count, in_penalty, updated_at)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
@@ -84,20 +93,25 @@ export async function POST(request: Request) {
           )
           .run();
         
-        results.push({ wordId: item.wordId });
+        console.log('[API /progress POST] 保存结果:', result);
+        results.push({ wordId: item.wordId, result });
       } catch (err) {
+        console.error('[API /progress POST] 保存错误:', err);
         errors.push({ wordId: item.wordId, error: String(err) });
       }
     }
 
+    console.log('[API /progress POST] 完成:', { saved: results.length, errors: errors.length });
+    
     return NextResponse.json({ 
       success: true, 
       saved: results.length,
+      results,
       errors: errors.length > 0 ? errors : undefined
     });
   } catch (error) {
-    console.error('Error:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('[API /progress POST] 全局错误:', error);
+    return NextResponse.json({ error: 'Internal server error', details: String(error) }, { status: 500 });
   }
 }
 

@@ -22,11 +22,23 @@ async function fetchProgress(username: string, semesterIds: number[]) {
 }
 
 async function saveProgress(username: string, progress: any[]) {
-  await fetch('/api/progress', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, progress }),
-  });
+  console.log('[saveProgress] 保存进度:', { username, count: progress.length, progress });
+  try {
+    const res = await fetch('/api/progress', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, progress }),
+    });
+    const data = await res.json();
+    console.log('[saveProgress] 响应:', data);
+    if (!res.ok || data.error) {
+      console.error('[saveProgress] 保存失败:', data);
+    }
+    return data;
+  } catch (error) {
+    console.error('[saveProgress] 请求错误:', error);
+    throw error;
+  }
 }
 
 async function recordStat(username: string, semesterId: number, type: 'new' | 'review') {
@@ -686,6 +698,15 @@ export function VocabAppContent() {
     // 使用 ref 获取最新的 sessionWords 数据
     const currentSessionWords = sessionWordsRef.current;
     
+    console.log('[finishSession] 开始保存进度');
+    console.log('[finishSession] sessionWords 数量:', currentSessionWords.length);
+    console.log('[finishSession] sessionWords 详情:', currentSessionWords.map(w => ({
+      id: w.id,
+      word: w.word,
+      tempStep: w.tempStep,
+      progress: w.progress
+    })));
+    
     // 找出所有有进度更新的单词（包括新学的和已复习的）
     const progressToSave = currentSessionWords
       .filter(w => w.progress && w.progress.state !== 'new')
@@ -693,7 +714,7 @@ export function VocabAppContent() {
         wordId: w.id,
         semesterId: w.semester_id,
         state: w.progress!.state,
-        nextReview: w.progress!.next_review,
+        nextReview: w.progress!.next_review || new Date().toISOString(),
         ef: w.progress!.ef ?? 25,
         interval: w.progress!.interval ?? 0,
         failureCount: w.progress!.failure_count ?? 0,
@@ -701,10 +722,16 @@ export function VocabAppContent() {
         inPenalty: false,
       }));
     
+    console.log('[finishSession] progressToSave:', progressToSave);
+    
     if (progressToSave.length > 0) {
-      await saveProgress(username, progressToSave);
+      console.log('[finishSession] 调用 saveProgress');
+      const result = await saveProgress(username, progressToSave);
+      console.log('[finishSession] saveProgress 结果:', result);
       setUnsavedCount(0);
       unsavedCountRef.current = 0;
+    } else {
+      console.log('[finishSession] 没有进度需要保存');
     }
 
     if (selectedSemesterIds.length > 0) {
