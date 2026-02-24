@@ -24,12 +24,23 @@ fi
 # 确保没有重复的 _worker.js
 rm -f .open-next/worker.js 2>/dev/null || true
 
-# 将 assets 目录内容移动到 .open-next 根目录（Cloudflare Pages 需要静态文件在根目录）
-echo "Moving assets to root for Cloudflare Pages..."
+# 重要：确保静态资源在根目录的 _next 文件夹中
+# Cloudflare Pages 需要静态文件直接在输出目录中
+echo "Setting up static assets for Cloudflare Pages..."
+if [ -d ".open-next/assets/_next" ] && [ ! -d ".open-next/_next" ]; then
+  cp -r .open-next/assets/_next .open-next/
+  echo "Copied assets/_next to root _next"
+fi
+
+# 复制其他静态文件到根目录
 if [ -d ".open-next/assets" ]; then
-  # 移动 assets 内容到父目录
-  cp -r .open-next/assets/* .open-next/ 2>/dev/null || true
-  echo "Assets moved to .open-next root"
+  for item in .open-next/assets/*; do
+    name=$(basename "$item")
+    if [ "$name" != "_next" ]; then
+      cp -r "$item" .open-next/ 2>/dev/null || true
+    fi
+  done
+  echo "Copied other static assets to root"
 fi
 
 # 修复符号链接问题：Cloudflare Pages 无法访问指向输出目录外的链接
@@ -81,10 +92,15 @@ if [ -d ".open-next" ]; then
 fi
 
 # 列出最终输出目录结构
+echo "=========================================="
 echo "Final .open-next structure:"
 ls -la .open-next/
 echo ""
-echo "Static chunks:"
-ls -la .open-next/_next/static/chunks/ 2>/dev/null || echo "No chunks directory"
+echo "Static chunks in root _next:"
+ls -la .open-next/_next/static/chunks/ 2>/dev/null || echo "No chunks in root _next"
+echo ""
+echo "Static chunks in assets/_next:"
+ls -la .open-next/assets/_next/static/chunks/ 2>/dev/null || echo "No chunks in assets/_next"
+echo "=========================================="
 
 echo "Build completed successfully!"
