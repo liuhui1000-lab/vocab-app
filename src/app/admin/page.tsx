@@ -182,12 +182,6 @@ export default function AdminPage() {
           }
         }
       }
-      
-      // 检查中文引号
-      if (line.includes('"') || line.includes('"')) {
-        showMessage('error', '第 ' + lineNum + ' 行错误: 发现中文引号，请改为英文引号\n\n' + line.trim());
-        return;
-      }
     }
     
     // 第二步：逐行解析
