@@ -6,23 +6,35 @@ export function formatDate(date: Date): string {
 }
 
 // Calculate next review time based on SM-2 algorithm
+// 复习逻辑：
+// - 新词第一次答对：3天后复习
+// - 复习词答对：间隔 × 2.5
+// - 答错：间隔清零为1（明天复习），当天进入惩罚模式
 export function calculateNextReview(
   success: boolean,
   currentEf: number,
-  currentInterval: number
+  currentInterval: number,
+  isNewWord: boolean = false
 ): { ef: number; interval: number; nextReview: Date } {
   let ef = currentEf;
   let interval = currentInterval;
   
   if (success) {
-    if (interval === 0) {
-      interval = 1;
+    if (isNewWord) {
+      // 新词第一次答对：直接跳到 3天后
+      interval = 3;
+    } else if (interval === 0) {
+      // 异常情况，当作新词处理
+      interval = 3;
     } else {
+      // 复习词答对：间隔 × EF（2.5倍）
       interval = Math.ceil(interval * (ef / 10));
     }
-    ef = Math.min(25, ef + 1); // max 2.5
+    // 增加 EF（最高 2.5）
+    ef = Math.min(25, ef + 1);
   } else {
-    ef = Math.max(13, ef - 2); // min 1.3
+    // 答错：EF 降低（最低 1.3），间隔清零为 1
+    ef = Math.max(13, ef - 2);
     interval = 1;
   }
   

@@ -633,7 +633,9 @@ export function VocabAppContent() {
     const currentEf = word.progress?.ef ?? 25;
     const currentInterval = word.progress?.interval ?? 0;
     
-    const { ef, interval, nextReview } = calculateNextReview(success, currentEf, currentInterval);
+    // 判断是否为新词（之前没有进度或状态为 new）
+    const isNewWord = !word.progress || word.progress.state === 'new';
+    const { ef, interval, nextReview } = calculateNextReview(success, currentEf, currentInterval, isNewWord);
     
     // HTML: w.state = success ? 'review' : 'learning'
     const newState = success ? 'review' : 'learning' as 'review' | 'learning';
