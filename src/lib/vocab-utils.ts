@@ -1,8 +1,33 @@
 // Utility functions for vocabulary app
 
-// Format date to YYYY-MM-DD
+// 获取当前学习日的基准时间（凌晨4点作为一天的分界）
+// 如果当前时间 < 04:00，则算作"昨天"的学习日
+export function getStudyDayDate(): Date {
+  const now = new Date();
+  if (now.getHours() < 4) {
+    // 凌晨4点前，算作昨天
+    now.setDate(now.getDate() - 1);
+  }
+  return now;
+}
+
+// 判断给定日期是否在当前学习日或之前（用于待复习判断）
+export function isDueForReview(reviewDateStr: string): boolean {
+  const reviewDate = new Date(reviewDateStr);
+  const studyDay = getStudyDayDate();
+  // 设置到当天的23:59:59，确保当天任何时间都算"已到复习时间"
+  studyDay.setHours(23, 59, 59, 999);
+  return reviewDate <= studyDay;
+}
+
+// Format date to YYYY-MM-DD（基于学习日）
 export function formatDate(date: Date): string {
   return date.toISOString().split('T')[0];
+}
+
+// 获取格式化的学习日日期（用于统计表）
+export function getStudyDayString(): string {
+  return formatDate(getStudyDayDate());
 }
 
 // Calculate next review time based on SM-2 algorithm
@@ -44,13 +69,12 @@ export function calculateNextReview(
   return { ef, interval, nextReview };
 }
 
-// Get words to review today
+// Get words to review today (基于凌晨4点分界的自然天)
 export function getWordsToReview(words: WordWithProgress[]): WordWithProgress[] {
-  const now = new Date();
   return words.filter(w => {
     if (!w.progress || w.progress.state === 'new') return false;
     if (!w.progress.next_review) return false;
-    return new Date(w.progress.next_review) <= now;
+    return isDueForReview(w.progress.next_review);
   });
 }
 

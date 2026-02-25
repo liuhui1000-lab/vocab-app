@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { shuffleArray, playWord, calculateNextReview, formatDate } from '@/lib/vocab-utils';
+import { shuffleArray, playWord, calculateNextReview, formatDate, getStudyDayDate, isDueForReview, getStudyDayString } from '@/lib/vocab-utils';
 import type { Semester, VocabWord, UserProgress, WordWithProgress, SessionWord } from '@/lib/types';
 
 // API helper functions
@@ -48,7 +48,7 @@ async function recordStat(username: string, semesterId: number, type: 'new' | 'r
     body: JSON.stringify({ 
       username, 
       semesterId, 
-      date: formatDate(new Date()), 
+      date: getStudyDayString(), // 使用凌晨4点分界的日期
       type 
     }),
   });
@@ -266,18 +266,18 @@ export function VocabAppContent() {
 
   // Get dashboard stats
   const getStats = useCallback(() => {
-    const now = new Date();
     const total = allWords.length;
     
     const newCount = allWords.filter(w => 
       !w.progress || w.progress.state === 'new'
     ).length;
     
+    // 使用凌晨4点分界的复习判断
     const reviewCount = allWords.filter(w => 
       w.progress && 
       w.progress.state !== 'new' && 
       w.progress.next_review && 
-      new Date(w.progress.next_review) <= now
+      isDueForReview(w.progress.next_review)
     ).length;
     
     const hardCount = allWords.filter(w => 
@@ -298,7 +298,7 @@ export function VocabAppContent() {
             w.progress && 
             w.progress.state !== 'new' && 
             w.progress.next_review && 
-            new Date(w.progress.next_review) <= now
+            isDueForReview(w.progress.next_review)
           ).length,
           hardCount: categoryWords.filter(w => w.progress && w.progress.failure_count > 3).length,
         };
@@ -317,16 +317,16 @@ export function VocabAppContent() {
     }
 
     setSessionType(type);
-    const now = new Date();
 
     let selectedWords: WordWithProgress[] = [];
     
     if (type === 'normal') {
+      // 使用凌晨4点分界的复习判断
       const reviewWords = allWords.filter(w => 
         w.progress && 
         w.progress.state !== 'new' && 
         w.progress.next_review && 
-        new Date(w.progress.next_review) <= now
+        isDueForReview(w.progress.next_review)
       );
       
       const newWords = allWords.filter(w => !w.progress || w.progress.state === 'new')
