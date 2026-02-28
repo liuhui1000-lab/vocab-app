@@ -17,18 +17,43 @@ interface Semester {
   wordCount?: number;
 }
 
+interface Word {
+  id: number;
+  semester_id: number;
+  word: string;
+  phonetic: string | null;
+  meaning: string;
+  example_en: string | null;
+  example_cn: string | null;
+  order: number;
+}
+
 export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<{ id: number; username: string; isAdmin: boolean } | null>(null);
   const [inputUsername, setInputUsername] = useState('');
   const [inputPassword, setInputPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   
-  const [activeTab, setActiveTab] = useState<'vocab' | 'users' | 'profile'>('vocab');
+  const [activeTab, setActiveTab] = useState<'vocab' | 'words' | 'users' | 'profile'>('vocab');
   const [users, setUsers] = useState<User[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState<number | null>(null);
   const [vocabJson, setVocabJson] = useState('');
   const [clearExisting, setClearExisting] = useState(false);
+  
+  // 单词列表管理
+  const [words, setWords] = useState<Word[]>([]);
+  const [selectedWordSemester, setSelectedWordSemester] = useState<number | null>(null);
+  const [editingWord, setEditingWord] = useState<Word | null>(null);
+  const [showCreateWord, setShowCreateWord] = useState(false);
+  const [wordForm, setWordForm] = useState({
+    word: '',
+    phonetic: '',
+    meaning: '',
+    example_en: '',
+    example_cn: ''
+  });
+  const [wordSearch, setWordSearch] = useState('');
   
   // 编辑用户
   const [editingUser, setEditingUser] = useState<User | null>(null);
@@ -101,6 +126,143 @@ export default function AdminPage() {
     } catch (e) {
       showMessage('error', '加载分类失败');
     }
+  };
+
+  // 加载单词列表
+  const loadWords = async (semesterId: number) => {
+    try {
+      const res = await fetch(`/api/admin/vocab?semesterId=${semesterId}`);
+      const data = await res.json();
+      if (data.words) {
+        setWords(data.words);
+      }
+    } catch (e) {
+      showMessage('error', '加载单词列表失败');
+    }
+  };
+
+  // 创建新单词
+  const handleCreateWord = async () => {
+    if (!wordForm.word.trim() || !wordForm.meaning.trim() || !selectedWordSemester) {
+      showMessage('error', '请填写单词和释义，并选择分类');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/vocab/word', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUsername: currentUser!.username,
+          semesterId: selectedWordSemester,
+          word: {
+            word: wordForm.word.trim(),
+            phonetic: wordForm.phonetic.trim() || undefined,
+            meaning: wordForm.meaning.trim(),
+            example_en: wordForm.example_en.trim() || undefined,
+            example_cn: wordForm.example_cn.trim() || undefined
+          }
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showMessage('success', '单词创建成功');
+        setShowCreateWord(false);
+        setWordForm({ word: '', phonetic: '', meaning: '', example_en: '', example_cn: '' });
+        loadWords(selectedWordSemester);
+        loadSemesters();
+      } else {
+        showMessage('error', data.error || '创建失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
+    }
+
+    setLoading(false);
+  };
+
+  // 更新单词
+  const handleUpdateWord = async () => {
+    if (!editingWord) return;
+
+    setLoading(true);
+
+    try {
+      const res = await fetch('/api/admin/vocab/word', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          adminUsername: currentUser!.username,
+          id: editingWord.id,
+          word: {
+            word: wordForm.word.trim(),
+            phonetic: wordForm.phonetic.trim() || undefined,
+            meaning: wordForm.meaning.trim(),
+            example_en: wordForm.example_en.trim() || undefined,
+            example_cn: wordForm.example_cn.trim() || undefined
+          }
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showMessage('success', '单词更新成功');
+        setEditingWord(null);
+        setWordForm({ word: '', phonetic: '', meaning: '', example_en: '', example_cn: '' });
+        if (selectedWordSemester) {
+          loadWords(selectedWordSemester);
+        }
+        loadSemesters();
+      } else {
+        showMessage('error', data.error || '更新失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
+    }
+
+    setLoading(false);
+  };
+
+  // 删除单词
+  const handleDeleteWord = async (id: number, word: string) => {
+    if (!confirm(`确定删除单词 "${word}"？此操作不可恢复！`)) return;
+
+    try {
+      const res = await fetch(`/api/admin/vocab/word?id=${id}&adminUsername=${encodeURIComponent(currentUser!.username)}`, {
+        method: 'DELETE',
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        showMessage('success', '单词已删除');
+        if (selectedWordSemester) {
+          loadWords(selectedWordSemester);
+        }
+        loadSemesters();
+      } else {
+        showMessage('error', data.error || '删除失败');
+      }
+    } catch (e) {
+      showMessage('error', '网络错误');
+    }
+  };
+
+  // 打开编辑单词弹窗
+  const openEditWord = (word: Word) => {
+    setEditingWord(word);
+    setWordForm({
+      word: word.word,
+      phonetic: word.phonetic || '',
+      meaning: word.meaning,
+      example_en: word.example_en || '',
+      example_cn: word.example_cn || ''
+    });
   };
 
   const handleLogin = async () => {
@@ -517,7 +679,15 @@ export default function AdminPage() {
               activeTab === 'vocab' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
             }`}
           >
-            📚 单词管理
+            📚 批量导入
+          </button>
+          <button
+            onClick={() => setActiveTab('words')}
+            className={`px-4 py-2 rounded-lg font-medium ${
+              activeTab === 'words' ? 'bg-blue-500 text-white' : 'bg-white text-gray-700 hover:bg-gray-50'
+            }`}
+          >
+            📝 单词列表
           </button>
           <button
             onClick={() => setActiveTab('users')}
@@ -621,6 +791,115 @@ export default function AdminPage() {
                   {loading ? '导入中...' : '🚀 开始导入'}
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==================== 单词列表管理 ==================== */}
+        {activeTab === 'words' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl shadow p-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+                <h2 className="text-lg font-bold">📝 单词列表</h2>
+                <button
+                  onClick={() => {
+                    setShowCreateWord(true);
+                    setWordForm({ word: '', phonetic: '', meaning: '', example_en: '', example_cn: '' });
+                  }}
+                  className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                >
+                  + 新增单词
+                </button>
+              </div>
+
+              {/* 选择分类 */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">选择分类</label>
+                <select
+                  value={selectedWordSemester || ''}
+                  onChange={(e) => {
+                    const id = e.target.value ? parseInt(e.target.value) : null;
+                    setSelectedWordSemester(id);
+                    if (id) loadWords(id);
+                    else setWords([]);
+                  }}
+                  className="w-full p-3 border rounded-lg"
+                >
+                  <option value="">-- 请选择分类 --</option>
+                  {semesters.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* 搜索框 */}
+              <div className="mb-4">
+                <input
+                  type="text"
+                  value={wordSearch}
+                  onChange={(e) => setWordSearch(e.target.value)}
+                  placeholder="搜索单词..."
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+
+              {/* 单词列表 */}
+              {selectedWordSemester ? (
+                words.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">暂无单词</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b bg-gray-50">
+                          <th className="text-left py-3 px-4 font-medium">ID</th>
+                          <th className="text-left py-3 px-4 font-medium">单词</th>
+                          <th className="text-left py-3 px-4 font-medium">音标</th>
+                          <th className="text-left py-3 px-4 font-medium">释义</th>
+                          <th className="text-left py-3 px-4 font-medium">例句</th>
+                          <th className="text-left py-3 px-4 font-medium">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {words
+                          .filter(w => 
+                            w.word.toLowerCase().includes(wordSearch.toLowerCase()) ||
+                            w.meaning.toLowerCase().includes(wordSearch.toLowerCase())
+                          )
+                          .map(word => (
+                          <tr key={word.id} className="border-b hover:bg-gray-50">
+                            <td className="py-3 px-4 text-sm">{word.id}</td>
+                            <td className="py-3 px-4 font-medium">{word.word}</td>
+                            <td className="py-3 px-4 text-sm text-gray-600">{word.phonetic || '-'}</td>
+                            <td className="py-3 px-4 text-sm">{word.meaning}</td>
+                            <td className="py-3 px-4 text-sm text-gray-500 max-w-xs truncate">
+                              {word.example_en || '-'}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex gap-2">
+                                <button
+                                  onClick={() => openEditWord(word)}
+                                  className="text-blue-500 hover:text-blue-700 text-sm"
+                                >
+                                  编辑
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteWord(word.id, word.word)}
+                                  className="text-red-500 hover:text-red-700 text-sm"
+                                >
+                                  删除
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              ) : (
+                <p className="text-gray-500 text-center py-8">请先选择分类</p>
+              )}
             </div>
           </div>
         )}
@@ -863,6 +1142,103 @@ export default function AdminPage() {
                 className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
               >
                 {loading ? '保存中...' : '保存'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== 创建/编辑单词弹窗 ==================== */}
+      {(showCreateWord || editingWord) && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl p-6 w-full max-w-lg max-h-[90vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">
+              {editingWord ? '编辑单词' : '新增单词'}
+            </h3>
+            
+            <div className="space-y-4">
+              {!editingWord && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">选择分类 *</label>
+                  <select
+                    value={selectedWordSemester || ''}
+                    onChange={(e) => setSelectedWordSemester(e.target.value ? parseInt(e.target.value) : null)}
+                    className="w-full p-3 border rounded-lg"
+                  >
+                    <option value="">-- 请选择分类 --</option>
+                    {semesters.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div>
+                <label className="block text-sm font-medium mb-1">单词 *</label>
+                <input
+                  type="text"
+                  value={wordForm.word}
+                  onChange={(e) => setWordForm({ ...wordForm, word: e.target.value })}
+                  placeholder="请输入单词"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">音标</label>
+                <input
+                  type="text"
+                  value={wordForm.phonetic}
+                  onChange={(e) => setWordForm({ ...wordForm, phonetic: e.target.value })}
+                  placeholder="/ˈɪŋɡlɪʃ/"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">释义 *</label>
+                <input
+                  type="text"
+                  value={wordForm.meaning}
+                  onChange={(e) => setWordForm({ ...wordForm, meaning: e.target.value })}
+                  placeholder="n. 英语；adj. 英国的"
+                  className="w-full p-3 border rounded-lg"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">英文例句</label>
+                <textarea
+                  value={wordForm.example_en}
+                  onChange={(e) => setWordForm({ ...wordForm, example_en: e.target.value })}
+                  placeholder="He speaks English fluently."
+                  className="w-full p-3 border rounded-lg h-20"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">中文翻译</label>
+                <textarea
+                  value={wordForm.example_cn}
+                  onChange={(e) => setWordForm({ ...wordForm, example_cn: e.target.value })}
+                  placeholder="他英语说得很流利。"
+                  className="w-full p-3 border rounded-lg h-20"
+                />
+              </div>
+            </div>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCreateWord(false);
+                  setEditingWord(null);
+                  setWordForm({ word: '', phonetic: '', meaning: '', example_en: '', example_cn: '' });
+                }}
+                className="flex-1 py-2 border rounded-lg hover:bg-gray-50"
+              >
+                取消
+              </button>
+              <button
+                onClick={editingWord ? handleUpdateWord : handleCreateWord}
+                disabled={loading}
+                className="flex-1 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+              >
+                {loading ? '保存中...' : (editingWord ? '保存' : '创建')}
               </button>
             </div>
           </div>
