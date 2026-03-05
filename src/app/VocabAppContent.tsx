@@ -156,7 +156,15 @@ export function VocabAppContent() {
   
   useEffect(() => {
     currentWordRef.current = currentWord;
-  }, [currentWord]);
+    
+    // 学习模式和选择题模式：显示单词时自动播放发音
+    if (currentWord && mode !== 'spell') {
+      // 小延迟确保DOM渲染完成
+      setTimeout(() => {
+        playWord(currentWord.word);
+      }, 100);
+    }
+  }, [currentWord, mode]);
 
   useEffect(() => {
     unsavedCountRef.current = unsavedCount;
