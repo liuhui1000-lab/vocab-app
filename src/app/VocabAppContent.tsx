@@ -105,9 +105,11 @@ export function VocabAppContent() {
   const [showAnswer, setShowAnswer] = useState(false);
   const [sessionType, setSessionType] = useState<'normal' | 'extra'>('normal');
   const [dailyLimit, setDailyLimit] = useState(20);
+  const [sessionLimit, setSessionLimit] = useState(20);  // 单次复习上限
   const [unsavedCount, setUnsavedCount] = useState(0);
   const unsavedCountRef = useRef(0);  // 添加 ref 追踪最新值
   const [spellResult, setSpellResult] = useState<{ correct: boolean; needMore?: number; completed?: boolean } | null>(null);
+  const [newWordsInSession, setNewWordsInSession] = useState(0);  // 当前会话已分配的新词数量
 
   // 同步 ref
   useEffect(() => {
@@ -310,6 +312,8 @@ export function VocabAppContent() {
   const stats = getStats();
 
   // Start learning session
+  // type: 'normal' - 从主页开始，包含新词+复习词
+  // type: 'extra' - 继续复习，只包含复习词（纯粹复习模式）
   const startSession = async (type: 'normal' | 'extra') => {
     if (allWords.length === 0) {
       alert('请先选择分类！');
@@ -321,25 +325,58 @@ export function VocabAppContent() {
     let selectedWords: WordWithProgress[] = [];
     
     if (type === 'normal') {
-      // 使用凌晨4点分界的复习判断
-      const reviewWords = allWords.filter(w => 
+      // 使用凌晨4点分界的复习判断，获取最紧急的复习词（限制数量）
+      const allReviewWords = allWords.filter(w => 
         w.progress && 
         w.progress.state !== 'new' && 
         w.progress.next_review && 
         isDueForReview(w.progress.next_review)
       );
       
-      const newWords = allWords.filter(w => !w.progress || w.progress.state === 'new')
-        .slice(0, dailyLimit);
+      // 按紧急程度排序（next_review最早的排前面）
+      const sortedReviewWords = allReviewWords.sort((a, b) => {
+        const dateA = new Date(a.progress!.next_review!).getTime();
+        const dateB = new Date(b.progress!.next_review!).getTime();
+        return dateA - dateB;
+      });
+      
+      // 限制复习词数量（最紧急的sessionLimit个）
+      const reviewWords = sortedReviewWords.slice(0, sessionLimit);
+      
+      // 新词只在主页开始时才分配，且不超过剩余额度
+      const remainingSlots = Math.max(0, sessionLimit - reviewWords.length);
+      const newWordsLimit = Math.min(dailyLimit - newWordsInSession, remainingSlots);
+      
+      const newWords = newWordsLimit > 0 
+        ? allWords.filter(w => !w.progress || w.progress.state === 'new')
+            .slice(0, newWordsLimit)
+        : [];
+      
+      // 更新已分配的新词数量
+      setNewWordsInSession(prev => prev + newWords.length);
       
       selectedWords = [...reviewWords, ...newWords];
     } else {
-      const learnedWords = allWords.filter(w => w.progress && w.progress.state !== 'new');
-      selectedWords = shuffleArray(learnedWords).slice(0, 20);
+      // 纯粹复习模式：只复习旧词，不包含新词
+      const allReviewWords = allWords.filter(w => 
+        w.progress && 
+        w.progress.state !== 'new' &&
+        w.progress.next_review &&
+        isDueForReview(w.progress.next_review)
+      );
+      
+      // 按紧急程度排序，取最紧急的
+      const sortedReviewWords = allReviewWords.sort((a, b) => {
+        const dateA = new Date(a.progress!.next_review!).getTime();
+        const dateB = new Date(b.progress!.next_review!).getTime();
+        return dateA - dateB;
+      });
+      
+      selectedWords = sortedReviewWords.slice(0, sessionLimit);
     }
 
     if (selectedWords.length === 0) {
-      alert('今日任务已完成！');
+      alert(type === 'extra' ? '没有更多需要复习的单词了！' : '今日任务已完成！');
       return;
     }
 
@@ -989,18 +1026,40 @@ export function VocabAppContent() {
           </div>
 
           {/* Daily limit */}
-          <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
               <span className="font-semibold text-gray-700">🎯 每日新词</span>
               <input
                 type="number"
                 value={dailyLimit}
-                onChange={(e) => setDailyLimit(parseInt(e.target.value) || 20)}
+                onChange={(e) => {
+                  const val = e.target.value === '' ? 0 : parseInt(e.target.value);
+                  setDailyLimit(isNaN(val) ? 0 : val);
+                }}
                 className="w-20 text-center border rounded-lg p-2"
-                min="1"
+                min="0"
                 max="100"
               />
             </div>
+            <p className="text-xs text-gray-400">设为0则今日只复习旧词</p>
+          </div>
+
+          {/* Session limit */}
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-6">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-semibold text-gray-700">📦 单次复习上限</span>
+              <select
+                value={sessionLimit}
+                onChange={(e) => setSessionLimit(parseInt(e.target.value))}
+                className="border rounded-lg p-2 bg-white"
+              >
+                <option value={10}>10 个</option>
+                <option value={20}>20 个</option>
+                <option value={30}>30 个</option>
+                <option value={40}>40 个</option>
+              </select>
+            </div>
+            <p className="text-xs text-gray-400">每次最多学习的单词数量，完成后可继续下一组</p>
           </div>
 
           {/* Action buttons */}
@@ -1246,30 +1305,63 @@ export function VocabAppContent() {
 
   // Finish view
   if (currentView === 'finish') {
+    // 计算是否还有更多待复习的单词
+    const remainingReviewCount = allWords.filter(w => 
+      w.progress && 
+      w.progress.state !== 'new' && 
+      w.progress.next_review && 
+      isDueForReview(w.progress.next_review)
+    ).length;
+    
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white p-4 flex items-center justify-center">
-        <div className="text-center">
+        <div className="text-center max-w-sm w-full">
           <div className="text-6xl mb-4">🎉</div>
           <h2 className="text-2xl font-bold text-gray-800 mb-2">任务完成！</h2>
-          <p className="text-gray-600 mb-8">
-            {sessionType === 'extra' 
-              ? `本次巩固 ${sessionWords.length} 个单词`
-              : `今日完成 ${sessionWords.length} 个单词`
-            }
+          <p className="text-gray-600 mb-2">
+            本组完成 {sessionWords.length} 个单词
           </p>
           
+          {/* 显示进度摘要 */}
+          <div className="bg-white rounded-xl p-4 mb-6 text-left">
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-500">新词学习：</span>
+              <span className="font-medium text-blue-600">
+                {sessionWords.filter(w => w.isNewThisSession).length} 个
+              </span>
+            </div>
+            <div className="flex justify-between text-sm mb-2">
+              <span className="text-gray-500">旧词复习：</span>
+              <span className="font-medium text-orange-600">
+                {sessionWords.filter(w => !w.isNewThisSession).length} 个
+              </span>
+            </div>
+            {remainingReviewCount > 0 && (
+              <div className="flex justify-between text-sm pt-2 border-t">
+                <span className="text-gray-500">还待复习：</span>
+                <span className="font-medium text-red-500">{remainingReviewCount} 个</span>
+              </div>
+            )}
+          </div>
+          
           <div className="space-y-3">
+            {remainingReviewCount > 0 ? (
+              <button
+                onClick={() => startSession('extra')}
+                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:bg-blue-600"
+              >
+                🚀 继续复习下一组 ({Math.min(sessionLimit, remainingReviewCount)}个)
+              </button>
+            ) : (
+              <div className="py-3 bg-green-100 text-green-700 rounded-2xl font-medium">
+                ✓ 今日复习任务全部完成！
+              </div>
+            )}
             <button
               onClick={() => setCurrentView('setup')}
-              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
+              className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold hover:bg-gray-200"
             >
               返回主页
-            </button>
-            <button
-              onClick={() => startSession('extra')}
-              className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold"
-            >
-              🔄 再复习 20 个
             </button>
           </div>
         </div>
