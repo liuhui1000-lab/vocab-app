@@ -1105,19 +1105,21 @@ export function VocabAppContent() {
     );
   }
 
-  // Study view
+  // Study view - 优化布局，适配键盘
   if (currentView === 'study' && currentWord) {
+    const isSpellMode = mode === 'spell';
+    
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col">
-        {/* Header */}
-        <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm">
+      <div className="h-[100dvh] bg-gray-50 flex flex-col overflow-hidden">
+        {/* Header - 固定顶部 */}
+        <div className="bg-white px-4 py-3 flex items-center justify-between shadow-sm shrink-0">
           <button
             onClick={() => {
               if (confirm('确定退出学习？进度会自动保存。')) {
                 finishSession();
               }
             }}
-            className="text-gray-500"
+            className="text-gray-500 p-2 -ml-2 cursor-pointer"
           >
             ✕ 退出
           </button>
@@ -1131,16 +1133,16 @@ export function VocabAppContent() {
 
         {/* Penalty badge */}
         {currentWord.inPenalty && (
-          <div className="bg-orange-50 text-orange-600 text-center py-1 text-sm font-medium">
+          <div className="bg-orange-50 text-orange-600 text-center py-1 text-sm font-medium shrink-0">
             🔥 强化中 ({currentWord.penaltyProgress}/3)
           </div>
         )}
 
-        {/* Card area */}
-        <div className="flex-1 p-4 flex flex-col">
-          <div className="bg-white rounded-2xl shadow-sm p-6 flex-1 flex flex-col items-center justify-center">
+        {/* Main content - 可滚动区域 */}
+        <div className="flex-1 overflow-y-auto p-4 pb-2">
+          <div className="bg-white rounded-2xl shadow-sm p-6 min-h-[200px] flex flex-col items-center justify-center">
             {/* Word display */}
-            {mode === 'spell' ? (
+            {isSpellMode ? (
               <div className="text-center">
                 <div className="text-xl text-gray-700 mb-4">{currentWord.meaning}</div>
               </div>
@@ -1150,7 +1152,7 @@ export function VocabAppContent() {
                 {currentWord.phonetic && (
                   <button
                     onClick={() => playWord(currentWord.word)}
-                    className="flex items-center gap-1 bg-gray-100 px-4 py-2 rounded-full text-gray-600 hover:bg-gray-200"
+                    className="flex items-center gap-1 bg-gray-100 px-4 py-2 rounded-full text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors"
                   >
                     <span>{currentWord.phonetic}</span>
                     <span>🔊</span>
@@ -1174,15 +1176,19 @@ export function VocabAppContent() {
               </div>
             )}
 
-            {/* Spell input */}
-            {mode === 'spell' && (
-              <div className="w-full mt-4">
+            {/* Spell input - 默写模式输入区 */}
+            {isSpellMode && (
+              <div className="w-full mt-4 space-y-3">
                 <input
                   id="spell-input"
-                  key={currentWord?.id}  // 当单词变化时，强制重新创建输入框，清空内容
+                  key={currentWord?.id}
                   type="text"
+                  inputMode="text"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  spellCheck="false"
                   placeholder="输入单词"
-                  className={`w-full text-center text-2xl p-4 border-2 rounded-xl focus:border-blue-500 outline-none ${
+                  className={`w-full text-center text-2xl p-4 border-2 rounded-xl focus:border-blue-500 outline-none transition-all ${
                     spellResult && !spellResult.correct ? 'border-red-500 bg-red-50' : ''
                   } ${
                     spellResult && spellResult.correct ? 'border-green-500 bg-green-50' : ''
@@ -1196,21 +1202,22 @@ export function VocabAppContent() {
                     }
                   }}
                 />
+                
                 {/* 默写结果反馈 */}
                 {spellResult && !spellResult.correct && (
-                  <div className="mt-3 text-center">
-                    <div className="text-red-500 font-medium text-lg mb-2">
+                  <div className="text-center">
+                    <div className="text-red-500 font-medium text-lg">
                       ✗ 正确答案: {currentWord.word}
                     </div>
                   </div>
                 )}
                 {spellResult && spellResult.correct && spellResult.needMore && (
-                  <div className="mt-3 text-center text-green-600 font-medium">
+                  <div className="text-center text-green-600 font-medium">
                     ✓ 正确！还需 {spellResult.needMore} 次巩固
                   </div>
                 )}
                 {spellResult && spellResult.correct && spellResult.completed && (
-                  <div className="mt-3 text-center text-green-600 font-medium text-lg">
+                  <div className="text-center text-green-600 font-medium text-lg">
                     ✓ 太棒了！已掌握
                   </div>
                 )}
@@ -1224,7 +1231,7 @@ export function VocabAppContent() {
                   <button
                     key={idx}
                     onClick={() => handleQuizAnswer(opt)}
-                    className="w-full p-4 text-left bg-gray-50 rounded-xl hover:bg-gray-100 transition-all border-2 border-transparent"
+                    className="w-full p-4 text-left bg-gray-50 rounded-xl hover:bg-gray-100 transition-all border-2 border-transparent cursor-pointer"
                   >
                     {opt}
                   </button>
@@ -1251,53 +1258,53 @@ export function VocabAppContent() {
               </div>
             )}
           </div>
+        </div>
 
-          {/* Action button - 完全沿用HTML逻辑 */}
-          <div className="mt-4">
-            {mode === 'learn' && (
-              <button
-                onClick={handleLearnNext}
-                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
-              >
-                记住了，去测试 →
-              </button>
-            )}
-            {mode === 'quiz' && showAnswer && (
-              <button
-                onClick={handleNext}
-                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
-              >
-                下一题 →
-              </button>
-            )}
-            {mode === 'spell' && !spellResult && (
-              <button
-                onClick={() => {
-                  const input = document.getElementById('spell-input') as HTMLInputElement;
-                  if (input) {
-                    handleSpellSubmit(input.value);
-                  }
-                }}
-                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg"
-              >
-                提交
-              </button>
-            )}
-            {mode === 'spell' && spellResult && (
-              <button
-                onClick={handleNext}
-                className={`w-full py-4 rounded-2xl font-semibold text-lg ${
-                  spellResult.correct 
-                    ? 'bg-green-500 text-white' 
-                    : 'bg-blue-500 text-white'
-                }`}
-              >
-                {spellResult.completed ? '太棒了！已掌握' : 
-                 spellResult.needMore ? `正确！还需 ${spellResult.needMore} 次巩固 →` : 
-                 '下一题 →'}
-              </button>
-            )}
-          </div>
+        {/* Action button - 固定在底部，键盘弹出时会自动上移 */}
+        <div className="shrink-0 px-4 pb-4 pt-2 bg-gray-50">
+          {mode === 'learn' && (
+            <button
+              onClick={handleLearnNext}
+              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+            >
+              记住了，去测试 →
+            </button>
+          )}
+          {mode === 'quiz' && showAnswer && (
+            <button
+              onClick={handleNext}
+              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+            >
+              下一题 →
+            </button>
+          )}
+          {isSpellMode && !spellResult && (
+            <button
+              onClick={() => {
+                const input = document.getElementById('spell-input') as HTMLInputElement;
+                if (input) {
+                  handleSpellSubmit(input.value);
+                }
+              }}
+              className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+            >
+              提交
+            </button>
+          )}
+          {isSpellMode && spellResult && (
+            <button
+              onClick={handleNext}
+              className={`w-full py-4 rounded-2xl font-semibold text-lg cursor-pointer active:scale-[0.98] transition-all ${
+                spellResult.correct 
+                  ? 'bg-green-500 text-white hover:bg-green-600' 
+                  : 'bg-blue-500 text-white hover:bg-blue-600'
+              }`}
+            >
+              {spellResult.completed ? '太棒了！已掌握' : 
+               spellResult.needMore ? `正确！还需 ${spellResult.needMore} 次巩固 →` : 
+               '下一题 →'}
+            </button>
+          )}
         </div>
       </div>
     );
