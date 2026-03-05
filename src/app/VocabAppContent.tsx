@@ -110,35 +110,38 @@ export function VocabAppContent() {
   const unsavedCountRef = useRef(0);  // 添加 ref 追踪最新值
   const [spellResult, setSpellResult] = useState<{ correct: boolean; needMore?: number; completed?: boolean } | null>(null);
   const [newWordsInSession, setNewWordsInSession] = useState(0);  // 当前会话已分配的新词数量
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);  // 键盘是否可见
+  const [keyboardHeight, setKeyboardHeight] = useState(0);  // 键盘高度(px)
 
-  // 监听键盘弹出/收起事件
+  // 监听键盘弹出/收起，使用 visualViewport API 精确获取键盘高度
   useEffect(() => {
     if (typeof window === 'undefined') return;
     
-    const handleResize = () => {
-      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+    const handleViewportChange = () => {
+      const viewport = window.visualViewport;
+      if (!viewport) return;
+      
+      const viewportHeight = viewport.height;
       const windowHeight = window.innerHeight;
-      // 当视口高度明显小于窗口高度时，说明键盘弹出了
-      const keyboardHeight = windowHeight - viewportHeight;
-      setIsKeyboardVisible(keyboardHeight > 150);  // 阈值150px
+      // 键盘高度 = 窗口高度 - 视口高度
+      const kbHeight = Math.max(0, windowHeight - viewportHeight);
+      
+      console.log('[Keyboard] viewportHeight:', viewportHeight, 'windowHeight:', windowHeight, 'keyboardHeight:', kbHeight);
+      setKeyboardHeight(kbHeight);
     };
     
-    // 使用 visualViewport API 监听视口变化
+    // 使用 visualViewport API（W3C标准方案）
     const viewport = window.visualViewport;
     if (viewport) {
-      viewport.addEventListener('resize', handleResize);
-      handleResize();  // 初始化检测
+      viewport.addEventListener('resize', handleViewportChange);
+      viewport.addEventListener('scroll', handleViewportChange);  // iOS有时触发scroll而非resize
+      handleViewportChange();  // 初始化
     }
-    
-    // 后备方案：监听 window resize
-    window.addEventListener('resize', handleResize);
     
     return () => {
       if (viewport) {
-        viewport.removeEventListener('resize', handleResize);
+        viewport.removeEventListener('resize', handleViewportChange);
+        viewport.removeEventListener('scroll', handleViewportChange);
       }
-      window.removeEventListener('resize', handleResize);
     };
   }, []);
 
@@ -1119,8 +1122,17 @@ export function VocabAppContent() {
     // 根据答题结果决定动画类
     const resultAnimation = spellResult?.correct ? 'success-bounce' : (spellResult && !spellResult.correct ? 'error-shake' : '');
     
+    // 计算内容区域的底部padding：按钮高度(约60px) + 键盘高度
+    const contentPaddingBottom = 60 + keyboardHeight;
+    
     return (
-      <div className="min-h-screen pb-24" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
+      <div 
+        className="min-h-screen" 
+        style={{ 
+          background: 'linear-gradient(to bottom, #EEF2FF, #fff)',
+          paddingBottom: `${contentPaddingBottom}px`
+        }}
+      >
         {/* Header - 固定顶部 */}
         <div className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2 flex items-center justify-between shadow-sm z-40 border-b border-indigo-100">
           <button
@@ -1280,8 +1292,15 @@ export function VocabAppContent() {
           </div>
         </div>
 
-        {/* Action button - 固定在底部 */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm px-3 py-3 border-t border-indigo-100 shadow-lg">
+        {/* Action button - 固定在底部，键盘弹出时上移 */}
+        <div 
+          className="fixed left-0 right-0 bg-white/95 backdrop-blur-sm px-3 py-3 border-t border-indigo-100 shadow-lg transition-all duration-200"
+          style={{ 
+            bottom: keyboardHeight > 0 ? `${keyboardHeight}px` : '0',
+            // 确保在键盘弹出时按钮区域可见
+            zIndex: 50
+          }}
+        >
           {mode === 'learn' && (
             <button
               onClick={handleLearnNext}
