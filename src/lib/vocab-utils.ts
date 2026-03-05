@@ -30,35 +30,43 @@ export function getStudyDayString(): string {
   return formatDate(getStudyDayDate());
 }
 
-// Calculate next review time based on SM-2 algorithm
-// 复习逻辑：
-// - 新词第一次答对：3天后复习
-// - 复习词答对：间隔 × 2.5
-// - 答错：间隔清零为1（明天复习），当天进入惩罚模式
+// Calculate next review time based on SM-2 algorithm with分层机制
+// 🟢 学霸词 (failureCount === 0): 正常SM-2，间隔 × 2.5
+// 🔴 康复词 (failureCount > 0): 双重验证机制
+//    - 答错后：interval = 1（明天复习）
+//    - 从错题池答对（isFromErrorPool=true）：interval 锁定为 1（明天再考一次）
+//    - 连续答对2次后：恢复正常乘法
 export function calculateNextReview(
   success: boolean,
   currentEf: number,
   currentInterval: number,
-  isNewWord: boolean = false
+  isNewWord: boolean = false,
+  failureCount: number = 0,
+  isFromErrorPool: boolean = false
 ): { ef: number; interval: number; nextReview: Date } {
   let ef = currentEf;
   let interval = currentInterval;
   
+  // 🟢 学霸词：无案底，正常SM-2
+  const isTopStudent = failureCount === 0;
+  
   if (success) {
     if (isNewWord) {
-      // 新词第一次答对：直接跳到 3天后
+      // 新词第一次答对：直接跳到 3天后（学霸快车道）
       interval = 3;
-    } else if (interval === 0) {
-      // 异常情况，当作新词处理
-      interval = 3;
+    } else if (isFromErrorPool && !isTopStudent) {
+      // 🔴 康复词从错题池答对：interval 锁定为 1（明天再考一次！）
+      // 系统潜台词："我不信你真记住了，明天再考你一次！"
+      interval = 1;
     } else {
-      // 复习词答对：间隔 × EF（2.5倍）
+      // 正常复习词答对：间隔 × EF（2.5倍）
       interval = Math.ceil(interval * (ef / 10));
     }
     // 增加 EF（最高 2.5）
     ef = Math.min(25, ef + 1);
   } else {
-    // 答错：EF 降低（最低 1.3），间隔清零为 1
+    // 🔴 答错：EF 降低（最低 1.3），interval 清零为 1（明天重背）
+    // 同时标记为有案底，进入康复词池
     ef = Math.max(13, ef - 2);
     interval = 1;
   }

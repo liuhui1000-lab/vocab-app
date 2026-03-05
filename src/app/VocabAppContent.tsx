@@ -632,13 +632,29 @@ export function VocabAppContent() {
   const updateWordState = async (word: SessionWord, success: boolean) => {
     const currentEf = word.progress?.ef ?? 25;
     const currentInterval = word.progress?.interval ?? 0;
+    const currentFailureCount = word.progress?.failure_count ?? 0;
     
     // 判断是否为新词（之前没有进度或状态为 new）
     const isNewWord = !word.progress || word.progress.state === 'new';
-    const { ef, interval, nextReview } = calculateNextReview(success, currentEf, currentInterval, isNewWord);
+    
+    // 判断是否"从错题池答对"：有案底(failureCount>0)且正在惩罚中
+    // 这是康复词的"双重验证"机制关键判断
+    const isFromErrorPool = currentFailureCount > 0 && word.inPenalty;
+    
+    const { ef, interval, nextReview } = calculateNextReview(
+      success, 
+      currentEf, 
+      currentInterval, 
+      isNewWord,
+      currentFailureCount,
+      isFromErrorPool  // 传递是否从错题池答对
+    );
     
     // HTML: w.state = success ? 'review' : 'learning'
     const newState = success ? 'review' : 'learning' as 'review' | 'learning';
+    
+    // 更新failureCount：答错+1，答对保持（学霸词保持0）
+    const newFailureCount = success ? currentFailureCount : currentFailureCount + 1;
     
     const progressUpdate = {
       wordId: word.id,
@@ -647,7 +663,7 @@ export function VocabAppContent() {
       nextReview: nextReview.toISOString(),
       ef,
       interval,
-      failureCount: success ? (word.progress?.failure_count ?? 0) : (word.progress?.failure_count ?? 0) + 1,
+      failureCount: newFailureCount,
       penaltyProgress: 0,
       inPenalty: !success,
     };
@@ -671,7 +687,7 @@ export function VocabAppContent() {
             ef,
             interval,
             next_review: nextReview.toISOString(),
-            failure_count: success ? (w.progress?.failure_count ?? 0) : (w.progress?.failure_count ?? 0) + 1,
+            failure_count: newFailureCount,
             penalty_progress: 0,
             in_penalty: !success,
             created_at: w.progress?.created_at ?? new Date().toISOString(),
