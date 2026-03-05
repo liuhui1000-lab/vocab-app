@@ -674,7 +674,9 @@ export function VocabAppContent() {
         return { correct: true, completed: true, updatedSessionWords: updated };
       }
     } else {
-      // 默写错误：进入惩罚模式
+      // 默写错误：进入惩罚模式，同时播放发音加深记忆
+      playWord(currentWord.word);
+      
       // HTML: this.currentCard.inPenalty = true; this.currentCard.penaltyProgress = 0;
       //       this.currentCard.tempStep = 0; this.updateState(false);
       const updated = currentSessionWords.map(w => 
@@ -1171,7 +1173,17 @@ export function VocabAppContent() {
               {/* Word display */}
               {isSpellMode ? (
                 <div className="text-center">
-                  <div className="text-xl text-indigo-800 mb-4 font-medium">{currentWord.meaning}</div>
+                  <div className="text-xl text-indigo-800 mb-2 font-medium">{currentWord.meaning}</div>
+                  {/* 默写模式也显示音标，帮助记忆发音 */}
+                  {currentWord.phonetic && (
+                    <button
+                      onClick={() => playWord(currentWord.word)}
+                      className="flex items-center gap-1 bg-indigo-50 px-4 py-2 rounded-full text-indigo-600 hover:bg-indigo-100 cursor-pointer transition-colors"
+                    >
+                      <span>{currentWord.phonetic}</span>
+                      <span>🔊</span>
+                    </button>
+                  )}
                 </div>
               ) : (
                 <>
