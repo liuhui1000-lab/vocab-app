@@ -871,10 +871,10 @@ export function VocabAppContent() {
   // 检查登录状态
   if (isCheckingAuth) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600">加载中...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-500 mx-auto"></div>
+          <p className="mt-4 text-indigo-600">加载中...</p>
         </div>
       </div>
     );
@@ -883,17 +883,17 @@ export function VocabAppContent() {
   // 登录页面
   if (!isLoggedIn) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-blue-50 to-white p-4">
+      <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="w-full max-w-sm">
           <div className="text-center mb-8">
             <div className="text-5xl mb-4">📚</div>
-            <h1 className="text-2xl font-bold text-gray-800">中考词汇通</h1>
-            <p className="text-gray-500 mt-2">选择学期 · 智能复习</p>
+            <h1 className="text-2xl font-bold text-indigo-900">中考词汇通</h1>
+            <p className="text-indigo-500 mt-2">选择学期 · 智能复习</p>
           </div>
           
-          <div className="bg-white rounded-2xl shadow-sm p-6">
-            <h2 className="text-lg font-semibold text-gray-700 mb-4">登录</h2>
-            <p className="text-sm text-gray-500 mb-4">
+          <div className="bg-white rounded-2xl shadow-sm p-6 border border-indigo-100">
+            <h2 className="text-lg font-semibold text-indigo-800 mb-4">登录</h2>
+            <p className="text-sm text-indigo-500 mb-4">
               输入用户名开始学习，换设备登录可继续进度
             </p>
             
@@ -904,7 +904,7 @@ export function VocabAppContent() {
                 onChange={(e) => setInputUsername(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="用户名"
-                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-indigo-900 placeholder:text-indigo-300"
                 maxLength={20}
                 autoFocus
               />
@@ -914,7 +914,7 @@ export function VocabAppContent() {
                 onChange={(e) => setInputPassword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
                 placeholder="密码（可选，管理员必填）"
-                className="w-full p-3 border rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                className="w-full p-3 border-2 border-indigo-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-indigo-900 placeholder:text-indigo-300"
               />
             </div>
             
@@ -924,18 +924,18 @@ export function VocabAppContent() {
             
             <button
               onClick={handleLogin}
-              className="w-full mt-4 py-3 bg-blue-500 text-white rounded-xl font-semibold hover:bg-blue-600"
+              className="w-full mt-4 py-3 bg-indigo-600 text-white rounded-xl font-semibold hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
             >
               登录
             </button>
             
-            <p className="text-xs text-gray-400 mt-4 text-center">
+            <p className="text-xs text-indigo-400 mt-4 text-center">
               支持：中文、字母、数字、下划线
             </p>
           </div>
           
-          <p className="text-center text-gray-400 text-sm mt-4">
-            <a href="/admin" className="text-blue-500 hover:underline">管理员入口</a>
+          <p className="text-center text-indigo-400 text-sm mt-4">
+            <a href="/admin" className="text-indigo-500 hover:text-indigo-700 hover:underline">管理员入口</a>
           </p>
         </div>
       </div>
@@ -945,13 +945,13 @@ export function VocabAppContent() {
   // Setup view
   if (currentView === 'setup') {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white p-3">
+      <div className="min-h-screen p-3" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="max-w-lg mx-auto space-y-3">
           {/* Header with user info */}
           <div className="text-center py-3">
-            <h1 className="text-2xl font-bold text-blue-600">📚 中考词汇通</h1>
+            <h1 className="text-2xl font-bold text-indigo-600">📚 中考词汇通</h1>
             <div className="flex items-center justify-center gap-2 mt-1">
-              <span className="text-gray-500 text-xs">用户：{username}</span>
+              <span className="text-indigo-400 text-xs">用户：{username}</span>
               <button 
                 onClick={handleLogout}
                 className="text-xs text-gray-400 hover:text-red-500"
@@ -964,36 +964,36 @@ export function VocabAppContent() {
           {/* Dashboard - 紧凑2x2网格 */}
           {selectedSemesterIds.length > 0 && (
             <div className="grid grid-cols-2 gap-2">
-              <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                <div className="text-2xl font-bold">{stats.total}</div>
-                <div className="text-xs text-gray-500">📚 总量</div>
+              <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-indigo-100">
+                <div className="text-2xl font-bold text-indigo-900">{stats.total}</div>
+                <div className="text-xs text-indigo-400">📚 总量</div>
               </div>
-              <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                <div className="text-2xl font-bold text-blue-500">{stats.learnedCount}</div>
-                <div className="text-xs text-gray-500">📖 已学习</div>
+              <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-indigo-100">
+                <div className="text-2xl font-bold text-green-500">{stats.learnedCount}</div>
+                <div className="text-xs text-indigo-400">📖 已学习</div>
               </div>
-              <div className="bg-white rounded-xl p-3 text-center shadow-sm">
-                <div className="text-2xl font-bold text-orange-500">{stats.reviewCount}</div>
-                <div className="text-xs text-gray-500">⏰ 待复习</div>
+              <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-indigo-100">
+                <div className="text-2xl font-bold text-amber-500">{stats.reviewCount}</div>
+                <div className="text-xs text-indigo-400">⏰ 待复习</div>
               </div>
-              <div className="bg-white rounded-xl p-3 text-center shadow-sm">
+              <div className="bg-white rounded-xl p-3 text-center shadow-sm border border-indigo-100">
                 <div className="text-2xl font-bold text-red-500">{stats.hardCount}</div>
-                <div className="text-xs text-gray-500">💀 困难</div>
+                <div className="text-xs text-indigo-400">💀 困难</div>
               </div>
             </div>
           )}
 
           {/* Loading indicator */}
           {isLoading && (
-            <div className="text-center py-3 text-gray-500">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500 mx-auto"></div>
+            <div className="text-center py-3 text-indigo-400">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-indigo-500 mx-auto"></div>
               <p className="mt-1 text-xs">加载中...</p>
             </div>
           )}
 
           {/* Semester selection - 紧凑2列网格 */}
-          <div className="bg-white rounded-xl p-3 shadow-sm">
-            <h2 className="font-semibold text-gray-700 mb-2 text-sm">选择分类</h2>
+          <div className="bg-white rounded-xl p-3 shadow-sm border border-indigo-100">
+            <h2 className="font-semibold text-indigo-700 mb-2 text-sm">选择分类</h2>
             <div className="grid grid-cols-2 gap-2">
               {semesters.map(semester => {
                 const isSelected = selectedSemesterIds.includes(semester.id);
@@ -1005,8 +1005,8 @@ export function VocabAppContent() {
                     key={semester.id}
                     className={`flex flex-col items-center justify-center p-2 rounded-lg cursor-pointer transition-all ${
                       isSelected
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                        ? 'bg-indigo-500 text-white shadow-sm'
+                        : 'bg-indigo-50 text-indigo-700 hover:bg-indigo-100'
                     }`}
                   >
                     <input
@@ -1019,13 +1019,13 @@ export function VocabAppContent() {
                       {semester.name}
                     </span>
                     {isSelected && wordCount > 0 && (
-                      <span className={`text-xs ${isSelected ? 'text-blue-100' : 'text-gray-500'}`}>
+                      <span className={`text-xs ${isSelected ? 'text-indigo-200' : 'text-indigo-400'}`}>
                         {wordCount}词
                         {categoryStat && categoryStat.learnedCount > 0 && ` · 已${categoryStat.learnedCount}`}
                       </span>
                     )}
                     {!isSelected && (
-                      <span className="text-xs text-gray-400">{wordCount}词</span>
+                      <span className="text-xs text-indigo-400">{wordCount}词</span>
                     )}
                   </label>
                 );
@@ -1036,9 +1036,9 @@ export function VocabAppContent() {
           {/* Settings - 紧凑两行 */}
           <div className="grid grid-cols-2 gap-2">
             {/* Daily limit */}
-            <div className="bg-white rounded-xl p-3 shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-700">🎯 每日新词</span>
+            <div className="bg-white rounded-xl p-3 shadow-sm border border-indigo-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-indigo-600">🎯 每日新词</span>
                 <input
                   type="number"
                   value={dailyLimit}
@@ -1046,7 +1046,7 @@ export function VocabAppContent() {
                     const val = e.target.value === '' ? 0 : parseInt(e.target.value);
                     setDailyLimit(isNaN(val) ? 0 : val);
                   }}
-                  className="w-12 text-center border rounded py-1 text-sm"
+                  className="w-12 text-center border border-indigo-200 rounded py-1 text-sm text-indigo-700 focus:border-indigo-500"
                   min="0"
                   max="100"
                 />
@@ -1054,13 +1054,13 @@ export function VocabAppContent() {
             </div>
 
             {/* Session limit */}
-            <div className="bg-white rounded-xl p-3 shadow-sm">
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-medium text-gray-700">📦 复习上限</span>
+            <div className="bg-white rounded-xl p-3 shadow-sm border border-indigo-100">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-indigo-600">📦 复习上限</span>
                 <select
                   value={sessionLimit}
                   onChange={(e) => setSessionLimit(parseInt(e.target.value))}
-                  className="border rounded py-1 text-sm bg-white"
+                  className="border border-indigo-200 rounded py-1 text-sm bg-white text-indigo-700 focus:border-indigo-500"
                 >
                   <option value={10}>10</option>
                   <option value={20}>20</option>
@@ -1077,7 +1077,7 @@ export function VocabAppContent() {
             disabled={selectedSemesterIds.length === 0}
             className={`w-full py-3 rounded-xl text-white font-semibold shadow-lg transition-all ${
               selectedSemesterIds.length > 0
-                ? 'bg-blue-500 hover:bg-blue-600 active:scale-98'
+                ? 'bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] shadow-indigo-200'
                 : 'bg-gray-300 cursor-not-allowed'
             }`}
           >
@@ -1088,20 +1088,20 @@ export function VocabAppContent() {
           <div className="flex gap-2">
             <button
               onClick={() => setCurrentView('stats')}
-              className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-200"
+              className="flex-1 py-2 bg-indigo-50 rounded-lg text-indigo-600 text-sm font-medium hover:bg-indigo-100 transition-colors"
             >
               📊 统计
             </button>
             <button
               onClick={() => setCurrentView('list')}
-              className="flex-1 py-2 bg-gray-100 rounded-lg text-gray-600 text-sm font-medium hover:bg-gray-200"
+              className="flex-1 py-2 bg-indigo-50 rounded-lg text-indigo-600 text-sm font-medium hover:bg-indigo-100 transition-colors"
             >
               📖 词表
             </button>
             {stats.hardCount > 0 && (
               <button
                 onClick={() => setCurrentView('hard')}
-                className="flex-1 py-2 bg-red-50 rounded-lg text-red-600 text-sm font-medium hover:bg-red-100"
+                className="flex-1 py-2 bg-red-50 rounded-lg text-red-600 text-sm font-medium hover:bg-red-100 transition-colors"
               >
                 💀 困难({stats.hardCount})
               </button>
@@ -1116,53 +1116,56 @@ export function VocabAppContent() {
   if (currentView === 'study' && currentWord) {
     const isSpellMode = mode === 'spell';
     
+    // 根据答题结果决定动画类
+    const resultAnimation = spellResult?.correct ? 'success-bounce' : (spellResult && !spellResult.correct ? 'error-shake' : '');
+    
     return (
-      <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="min-h-screen pb-24" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         {/* Header - 固定顶部 */}
-        <div className="fixed top-0 left-0 right-0 bg-white px-4 py-2 flex items-center justify-between shadow-sm z-40">
+        <div className="fixed top-0 left-0 right-0 bg-white/90 backdrop-blur-sm px-4 py-2 flex items-center justify-between shadow-sm z-40 border-b border-indigo-100">
           <button
             onClick={() => {
               if (confirm('确定退出学习？进度会自动保存。')) {
                 finishSession();
               }
             }}
-            className="text-gray-500 p-2 -ml-2 cursor-pointer text-sm"
+            className="text-indigo-400 p-2 -ml-2 cursor-pointer text-sm hover:text-indigo-600"
           >
             ✕ 退出
           </button>
-          <span className="text-xs text-gray-500">
+          <span className="text-xs text-indigo-500 font-medium">
             {sessionWords.filter(w => w.tempStep === 2).length}/{sessionWords.length}
           </span>
-          <span className={`text-xs ${unsavedCount > 0 ? 'text-orange-500' : 'text-gray-400'}`}>
-            {unsavedCount > 0 ? `+${unsavedCount}` : '已同步'}
+          <span className={`text-xs ${unsavedCount > 0 ? 'text-amber-500' : 'text-green-500'}`}>
+            {unsavedCount > 0 ? `+${unsavedCount}` : '✓'}
           </span>
         </div>
 
         {/* Padding for fixed header */}
-        <div className="h-10"></div>
+        <div className="h-12"></div>
 
         {/* Penalty badge */}
         {currentWord.inPenalty && (
-          <div className="bg-orange-50 text-orange-600 text-center py-1 text-xs font-medium">
+          <div className="bg-amber-50 text-amber-600 text-center py-1 text-xs font-medium">
             🔥 强化中 ({currentWord.penaltyProgress}/3)
           </div>
         )}
 
         {/* Main content */}
         <div className="p-3">
-          <div className="bg-white rounded-2xl shadow-sm p-4 sm:p-6 flex flex-col items-center justify-center min-h-[200px]">
+          <div className={`bg-white rounded-2xl shadow-sm border border-indigo-100 p-4 sm:p-6 flex flex-col items-center justify-center min-h-[200px] ${resultAnimation}`}>
             {/* Word display */}
             {isSpellMode ? (
               <div className="text-center">
-                <div className="text-xl text-gray-700 mb-4">{currentWord.meaning}</div>
+                <div className="text-xl text-indigo-800 mb-4 font-medium">{currentWord.meaning}</div>
               </div>
             ) : (
               <>
-                <div className="text-4xl font-bold text-gray-800 mb-2">{currentWord.word}</div>
+                <div className="text-4xl font-bold text-indigo-900 mb-2">{currentWord.word}</div>
                 {currentWord.phonetic && (
                   <button
                     onClick={() => playWord(currentWord.word)}
-                    className="flex items-center gap-1 bg-gray-100 px-4 py-2 rounded-full text-gray-600 hover:bg-gray-200 cursor-pointer transition-colors"
+                    className="flex items-center gap-1 bg-indigo-50 px-4 py-2 rounded-full text-indigo-600 hover:bg-indigo-100 cursor-pointer transition-colors"
                   >
                     <span>{currentWord.phonetic}</span>
                     <span>🔊</span>
@@ -1174,10 +1177,10 @@ export function VocabAppContent() {
             {/* Meaning (learn mode) */}
             {mode === 'learn' && (
               <div className="mt-6 text-center">
-                <div className="text-xl text-gray-700">{currentWord.meaning}</div>
+                <div className="text-xl text-indigo-800">{currentWord.meaning}</div>
                 {currentWord.example_en && (
-                  <div className="mt-4 p-4 bg-blue-50 rounded-xl text-left w-full">
-                    <div className="text-gray-800">{currentWord.example_en}</div>
+                  <div className="mt-4 p-4 bg-indigo-50 rounded-xl text-left w-full border border-indigo-100">
+                    <div className="text-indigo-900">{currentWord.example_en}</div>
                     {currentWord.example_cn && (
                       <div className="text-gray-500 text-sm mt-1">{currentWord.example_cn}</div>
                     )}
@@ -1198,7 +1201,7 @@ export function VocabAppContent() {
                   autoCorrect="off"
                   spellCheck="false"
                   placeholder="输入单词"
-                  className={`w-full text-center text-2xl p-4 border-2 rounded-xl focus:border-blue-500 outline-none transition-all ${
+                  className={`w-full text-center text-2xl p-4 border-2 rounded-xl focus:border-indigo-500 outline-none transition-all ${
                     spellResult && !spellResult.correct ? 'border-red-500 bg-red-50' : ''
                   } ${
                     spellResult && spellResult.correct ? 'border-green-500 bg-green-50' : ''
@@ -1223,18 +1226,18 @@ export function VocabAppContent() {
                 {/* 默写结果反馈 */}
                 {spellResult && !spellResult.correct && (
                   <div className="text-center">
-                    <div className="text-red-500 font-medium text-lg">
+                    <div className="text-red-500 font-medium text-lg error-shake">
                       ✗ 正确答案: {currentWord.word}
                     </div>
                   </div>
                 )}
                 {spellResult && spellResult.correct && spellResult.needMore && (
-                  <div className="text-center text-green-600 font-medium">
+                  <div className="text-center text-green-600 font-medium success-bounce">
                     ✓ 正确！还需 {spellResult.needMore} 次巩固
                   </div>
                 )}
                 {spellResult && spellResult.correct && spellResult.completed && (
-                  <div className="text-center text-green-600 font-medium text-lg">
+                  <div className="text-center text-green-600 font-medium text-lg success-bounce">
                     ✓ 太棒了！已掌握
                   </div>
                 )}
@@ -1248,7 +1251,7 @@ export function VocabAppContent() {
                   <button
                     key={idx}
                     onClick={() => handleQuizAnswer(opt)}
-                    className="w-full p-4 text-left bg-gray-50 rounded-xl hover:bg-gray-100 transition-all border-2 border-transparent cursor-pointer"
+                    className="w-full p-4 text-left bg-indigo-50 rounded-xl hover:bg-indigo-100 transition-all border-2 border-transparent hover:border-indigo-300 cursor-pointer text-indigo-900"
                   >
                     {opt}
                   </button>
@@ -1260,15 +1263,15 @@ export function VocabAppContent() {
             {mode === 'quiz' && showAnswer && (
               <div className="mt-6 text-center">
                 <div className={`text-xl font-medium mb-4 ${
-                  currentWord.tempStep >= 1.5 ? 'text-green-600' : 'text-red-500'
+                  currentWord.tempStep >= 1.5 ? 'text-green-600 success-bounce' : 'text-red-500 error-shake'
                 }`}>
                   {currentWord.tempStep >= 1.5 ? '✓ 正确！' : `✗ 正确答案: ${currentWord.meaning}`}
                 </div>
                 {currentWord.example_en && (
-                  <div className="p-4 bg-blue-50 rounded-xl text-left w-full">
-                    <div className="text-gray-800">{currentWord.example_en}</div>
+                  <div className="p-4 bg-indigo-50 rounded-xl text-left w-full border border-indigo-100">
+                    <div className="text-indigo-900">{currentWord.example_en}</div>
                     {currentWord.example_cn && (
-                      <div className="text-gray-500 text-sm mt-1">{currentWord.example_cn}</div>
+                      <div className="text-indigo-500 text-sm mt-1">{currentWord.example_cn}</div>
                     )}
                   </div>
                 )}
@@ -1278,11 +1281,11 @@ export function VocabAppContent() {
         </div>
 
         {/* Action button - 固定在底部 */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white px-3 py-3 border-t border-gray-100 shadow-lg">
+        <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm px-3 py-3 border-t border-indigo-100 shadow-lg">
           {mode === 'learn' && (
             <button
               onClick={handleLearnNext}
-              className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold cursor-pointer hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
             >
               记住了，去测试 →
             </button>
@@ -1290,7 +1293,7 @@ export function VocabAppContent() {
           {mode === 'quiz' && showAnswer && (
             <button
               onClick={handleNext}
-              className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold cursor-pointer hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
             >
               下一题 →
             </button>
@@ -1303,7 +1306,7 @@ export function VocabAppContent() {
                   handleSpellSubmit(input.value);
                 }
               }}
-              className="w-full py-3 bg-blue-500 text-white rounded-xl font-semibold cursor-pointer hover:bg-blue-600 active:scale-[0.98] transition-all"
+              className="w-full py-3 bg-indigo-600 text-white rounded-xl font-semibold cursor-pointer hover:bg-indigo-700 active:scale-[0.98] transition-all shadow-sm"
             >
               提交
             </button>
@@ -1311,10 +1314,10 @@ export function VocabAppContent() {
           {isSpellMode && spellResult && (
             <button
               onClick={handleNext}
-              className={`w-full py-3 rounded-xl font-semibold cursor-pointer active:scale-[0.98] transition-all ${
+              className={`w-full py-3 rounded-xl font-semibold cursor-pointer active:scale-[0.98] transition-all shadow-sm ${
                 spellResult.correct 
                   ? 'bg-green-500 text-white hover:bg-green-600' 
-                  : 'bg-blue-500 text-white hover:bg-blue-600'
+                  : 'bg-indigo-600 text-white hover:bg-indigo-700'
               }`}
             >
               {spellResult.completed ? '太棒了！已掌握' : 
@@ -1338,31 +1341,31 @@ export function VocabAppContent() {
     ).length;
     
     return (
-      <div className="min-h-screen bg-gradient-to-b from-green-50 to-white p-4 flex items-center justify-center">
+      <div className="min-h-screen p-4 flex items-center justify-center" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="text-center max-w-sm w-full">
-          <div className="text-6xl mb-4">🎉</div>
-          <h2 className="text-2xl font-bold text-gray-800 mb-2">任务完成！</h2>
-          <p className="text-gray-600 mb-2">
+          <div className="text-6xl mb-4 success-bounce">🎉</div>
+          <h2 className="text-2xl font-bold text-indigo-900 mb-2">任务完成！</h2>
+          <p className="text-indigo-600 mb-2">
             本组完成 {sessionWords.length} 个单词
           </p>
           
           {/* 显示进度摘要 */}
-          <div className="bg-white rounded-xl p-4 mb-6 text-left">
+          <div className="bg-white rounded-xl p-4 mb-6 text-left border border-indigo-100 shadow-sm">
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-500">新词学习：</span>
-              <span className="font-medium text-blue-600">
+              <span className="text-indigo-500">新词学习：</span>
+              <span className="font-medium text-indigo-700">
                 {sessionWords.filter(w => w.isNewThisSession).length} 个
               </span>
             </div>
             <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-500">旧词复习：</span>
-              <span className="font-medium text-orange-600">
+              <span className="text-indigo-500">旧词复习：</span>
+              <span className="font-medium text-amber-600">
                 {sessionWords.filter(w => !w.isNewThisSession).length} 个
               </span>
             </div>
             {remainingReviewCount > 0 && (
-              <div className="flex justify-between text-sm pt-2 border-t">
-                <span className="text-gray-500">还待复习：</span>
+              <div className="flex justify-between text-sm pt-2 border-t border-indigo-100">
+                <span className="text-indigo-500">还待复习：</span>
                 <span className="font-medium text-red-500">{remainingReviewCount} 个</span>
               </div>
             )}
@@ -1372,18 +1375,18 @@ export function VocabAppContent() {
             {remainingReviewCount > 0 ? (
               <button
                 onClick={() => startSession('extra')}
-                className="w-full py-4 bg-blue-500 text-white rounded-2xl font-semibold text-lg shadow-lg hover:bg-blue-600"
+                className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-semibold text-lg shadow-lg hover:bg-indigo-700 active:scale-[0.98] transition-all"
               >
                 🚀 继续复习下一组 ({Math.min(sessionLimit, remainingReviewCount)}个)
               </button>
             ) : (
-              <div className="py-3 bg-green-100 text-green-700 rounded-2xl font-medium">
+              <div className="py-3 bg-green-100 text-green-700 rounded-2xl font-medium success-bounce">
                 ✓ 今日复习任务全部完成！
               </div>
             )}
             <button
               onClick={() => setCurrentView('setup')}
-              className="w-full py-4 bg-gray-100 text-gray-700 rounded-2xl font-semibold hover:bg-gray-200"
+              className="w-full py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-semibold hover:bg-indigo-100 active:scale-[0.98] transition-all"
             >
               返回主页
             </button>
@@ -1396,55 +1399,55 @@ export function VocabAppContent() {
   // Stats view
   if (currentView === 'stats') {
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen p-4" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-bold">📊 学习统计</h1>
+            <h1 className="text-xl font-bold text-indigo-900">📊 学习统计</h1>
             <button
               onClick={() => setCurrentView('setup')}
-              className="text-gray-500"
+              className="text-indigo-400 hover:text-indigo-600 cursor-pointer"
             >
               ✕
             </button>
           </div>
 
           {/* Total stats */}
-          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-            <h3 className="font-medium text-gray-600 mb-3">总览</h3>
+          <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-indigo-100">
+            <h3 className="font-medium text-indigo-600 mb-3">总览</h3>
             <div className="grid grid-cols-2 gap-4">
-              <div className="text-center p-3 bg-gray-50 rounded-xl">
-                <div className="text-2xl font-bold">{stats.total}</div>
-                <div className="text-xs text-gray-500">总单词数</div>
+              <div className="text-center p-3 bg-indigo-50 rounded-xl">
+                <div className="text-2xl font-bold text-indigo-900">{stats.total}</div>
+                <div className="text-xs text-indigo-500">总单词数</div>
               </div>
-              <div className="text-center p-3 bg-blue-50 rounded-xl">
-                <div className="text-2xl font-bold text-blue-600">
+              <div className="text-center p-3 bg-green-50 rounded-xl">
+                <div className="text-2xl font-bold text-green-600">
                   {stats.learnedCount}
                 </div>
-                <div className="text-xs text-gray-500">已学习</div>
+                <div className="text-xs text-green-500">已学习</div>
               </div>
             </div>
           </div>
 
           {/* Per-category stats */}
           {stats.categoryStats && stats.categoryStats.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4">
-              <h3 className="font-medium text-gray-600 mb-3">分类统计</h3>
+            <div className="bg-white rounded-2xl shadow-sm p-4 mb-4 border border-indigo-100">
+              <h3 className="font-medium text-indigo-600 mb-3">分类统计</h3>
               <div className="space-y-3">
                 {stats.categoryStats.map(cs => {
                   const progress = cs.total > 0 ? Math.round((cs.learnedCount / cs.total) * 100) : 0;
                   return (
-                    <div key={cs.id} className="p-3 bg-gray-50 rounded-xl">
+                    <div key={cs.id} className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
                       <div className="flex items-center justify-between mb-2">
-                        <span className="font-medium">{cs.name}</span>
-                        <span className="text-sm text-gray-500">{progress}%</span>
+                        <span className="font-medium text-indigo-900">{cs.name}</span>
+                        <span className="text-sm text-indigo-500">{progress}%</span>
                       </div>
-                      <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                      <div className="h-2 bg-indigo-100 rounded-full overflow-hidden">
                         <div 
-                          className="h-full bg-blue-500 rounded-full transition-all"
+                          className="h-full bg-indigo-500 rounded-full transition-all"
                           style={{ width: `${progress}%` }}
                         />
                       </div>
-                      <div className="flex gap-4 mt-2 text-xs text-gray-500">
+                      <div className="flex gap-4 mt-2 text-xs text-indigo-400">
                         <span>总数: {cs.total}</span>
                         <span>已学习: {cs.learnedCount}</span>
                         <span>待复习: {cs.reviewCount}</span>
@@ -1459,7 +1462,7 @@ export function VocabAppContent() {
 
           <button
             onClick={() => setCurrentView('setup')}
-            className="w-full mt-4 py-4 bg-gray-100 rounded-2xl font-medium"
+            className="w-full mt-4 py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-medium hover:bg-indigo-100 active:scale-[0.98] transition-all"
           >
             返回
           </button>
@@ -1482,46 +1485,46 @@ export function VocabAppContent() {
     });
 
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen p-4" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-bold">💀 困难单词</h1>
+            <h1 className="text-xl font-bold text-indigo-900">💀 困难单词</h1>
             <button
               onClick={() => setCurrentView('setup')}
-              className="text-gray-500"
+              className="text-indigo-400 hover:text-indigo-600 cursor-pointer"
             >
               ✕
             </button>
           </div>
 
           {hardWords.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm p-4 text-center py-8 text-gray-500">
-              <div className="text-4xl mb-2">🎉</div>
+            <div className="bg-white rounded-2xl shadow-sm p-4 text-center py-8 text-indigo-500 border border-indigo-100">
+              <div className="text-4xl mb-2 success-bounce">🎉</div>
               <p>太棒了！没有困难单词</p>
             </div>
           ) : (
             <div className="space-y-4">
               {Array.from(hardWordsBySemester.values()).map(({ semester, words }) => (
                 <div key={semester.id}>
-                  <h3 className="font-medium text-gray-600 mb-2 px-1 flex items-center justify-between">
+                  <h3 className="font-medium text-indigo-600 mb-2 px-1 flex items-center justify-between">
                     <span>{semester.name}</span>
-                    <span className="text-sm text-gray-400">{words.length}词</span>
+                    <span className="text-sm text-indigo-400">{words.length}词</span>
                   </h3>
                   <div className="space-y-2">
                     {words.map(word => (
                       <div
                         key={word.id}
                         onClick={() => playWord(word.word)}
-                        className="bg-white rounded-xl p-4 cursor-pointer hover:bg-gray-50"
+                        className="bg-white rounded-xl p-4 cursor-pointer hover:bg-indigo-50 border border-indigo-100 active:scale-[0.98] transition-all"
                       >
                         <div className="flex items-center gap-3 mb-1">
-                          <span className="font-medium">{word.word}</span>
-                          <span className="text-gray-400 text-xs">{word.phonetic}</span>
+                          <span className="font-medium text-indigo-900">{word.word}</span>
+                          <span className="text-indigo-400 text-xs">{word.phonetic}</span>
                           <span className="text-red-500 text-xs ml-auto">
                             错误 {word.progress?.failure_count} 次
                           </span>
                         </div>
-                        <div className="text-gray-500 text-sm">{word.meaning}</div>
+                        <div className="text-indigo-600 text-sm">{word.meaning}</div>
                       </div>
                     ))}
                   </div>
@@ -1532,7 +1535,7 @@ export function VocabAppContent() {
 
           <button
             onClick={() => setCurrentView('setup')}
-            className="w-full mt-4 py-4 bg-gray-100 rounded-2xl font-medium"
+            className="w-full mt-4 py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-medium hover:bg-indigo-100 active:scale-[0.98] transition-all"
           >
             返回
           </button>
@@ -1556,42 +1559,42 @@ export function VocabAppContent() {
       });
 
     return (
-      <div className="min-h-screen bg-gray-50 p-4">
+      <div className="min-h-screen p-4" style={{ background: 'linear-gradient(to bottom, #EEF2FF, #fff)' }}>
         <div className="max-w-lg mx-auto">
           <div className="flex items-center justify-between mb-6">
-            <h1 className="text-xl font-bold">📖 单词列表</h1>
+            <h1 className="text-xl font-bold text-indigo-900">📖 单词列表</h1>
             <button
               onClick={() => setCurrentView('setup')}
-              className="text-gray-500"
+              className="text-indigo-400 hover:text-indigo-600 cursor-pointer"
             >
               ✕
             </button>
           </div>
 
           {allWords.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow-sm p-4 text-center py-8 text-gray-500">
+            <div className="bg-white rounded-2xl shadow-sm p-4 text-center py-8 text-indigo-500 border border-indigo-100">
               请先选择分类
             </div>
           ) : (
             <div className="space-y-4">
               {Array.from(wordsBySemester.values()).map(({ semester, words }) => (
                 <div key={semester.id}>
-                  <h3 className="font-medium text-gray-600 mb-2 px-1">{semester.name}</h3>
+                  <h3 className="font-medium text-indigo-600 mb-2 px-1">{semester.name}</h3>
                   <div className="space-y-2">
                     {words.map(word => (
                       <div
                         key={word.id}
                         onClick={() => playWord(word.word)}
-                        className="bg-white rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-gray-50"
+                        className="bg-white rounded-xl p-4 flex items-center gap-3 cursor-pointer hover:bg-indigo-50 border border-indigo-100 active:scale-[0.98] transition-all"
                       >
                         <span className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                          !word.progress ? 'bg-gray-300' :
+                          !word.progress ? 'bg-indigo-300' :
                           word.progress.state === 'review' ? 'bg-green-500' :
-                          word.progress.failure_count > 3 ? 'bg-red-500' : 'bg-orange-500'
+                          word.progress.failure_count > 3 ? 'bg-red-500' : 'bg-amber-500'
                         }`} />
-                        <span className="font-medium">{word.word}</span>
-                        <span className="text-gray-400 text-xs">{word.phonetic}</span>
-                        <span className="text-gray-500 text-sm truncate flex-1 text-right">{word.meaning}</span>
+                        <span className="font-medium text-indigo-900">{word.word}</span>
+                        <span className="text-indigo-400 text-xs">{word.phonetic}</span>
+                        <span className="text-indigo-600 text-sm truncate flex-1 text-right">{word.meaning}</span>
                       </div>
                     ))}
                   </div>
@@ -1602,7 +1605,7 @@ export function VocabAppContent() {
 
           <button
             onClick={() => setCurrentView('setup')}
-            className="w-full mt-4 py-4 bg-gray-100 rounded-2xl font-medium"
+            className="w-full mt-4 py-4 bg-indigo-50 text-indigo-700 rounded-2xl font-medium hover:bg-indigo-100 active:scale-[0.98] transition-all"
           >
             返回
           </button>

@@ -1,15 +1,18 @@
 @import "tailwindcss";
 
+/* 教育主题配色 */
 :root {
-  --primary: #007AFF;
-  --bg: #f2f2f7;
+  --primary: #4F46E5;        /* 靛蓝 - 主色调 */
+  --primary-light: #818CF8;  /* 浅靛蓝 */
+  --success: #22C55E;        /* 进度绿 - 成功/鼓励 */
+  --warning: #F59E0B;        /* 警告橙 */
+  --danger: #EF4444;         /* 错误红 */
+  --bg: #EEF2FF;             /* 浅靛蓝背景 */
   --card: #fff;
-  --text: #000;
-  --gray: #8e8e93;
-  --green: #34c759;
-  --red: #ff3b30;
-  --orange: #FF9500;
-  --border: #e5e5ea;
+  --text: #1E1B4B;           /* 深靛蓝文字 */
+  --text-muted: #6366F1;     /* 柔和文字 */
+  --gray: #94A3B8;
+  --border: #E0E7FF;
 }
 
 * {
@@ -21,6 +24,8 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
   padding: 0;
+  background: linear-gradient(to bottom, var(--bg), #fff);
+  min-height: 100vh;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -35,7 +40,7 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #ddd;
+  background: #C7D2FE;
   border-radius: 2px;
 }
 
@@ -45,13 +50,14 @@ body {
 }
 
 /* Smooth transitions */
-button, input, label {
-  transition: all 0.15s ease;
+button, input, label, .card {
+  transition: all 0.2s ease;
 }
 
 /* Focus styles */
 input:focus {
   outline: none;
+  box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.2);
 }
 
 /* Checkbox styling */
@@ -59,7 +65,7 @@ input[type="checkbox"] {
   appearance: none;
   width: 20px;
   height: 20px;
-  border: 2px solid #ddd;
+  border: 2px solid #C7D2FE;
   border-radius: 6px;
   background: white;
   cursor: pointer;
@@ -90,4 +96,125 @@ input[type="number"]::-webkit-outer-spin-button,
 input[type="number"]::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+/* ============ 鼓励动效（轻微、不夸张） ============ */
+
+/* 答对时的轻微弹跳 */
+@keyframes success-bounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+.success-bounce {
+  animation: success-bounce 0.3s ease;
+}
+
+/* 答对时的绿色闪过 */
+@keyframes success-flash {
+  0% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+.success-flash {
+  animation: success-flash 0.4s ease;
+}
+
+/* 答错时的轻微抖动 */
+@keyframes error-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+
+.error-shake {
+  animation: error-shake 0.3s ease;
+}
+
+/* 完成时的庆祝动画 */
+@keyframes celebrate {
+  0% { transform: scale(0.8); opacity: 0; }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.celebrate {
+  animation: celebrate 0.5s ease;
+}
+
+/* 进度条填充动画 */
+@keyframes progress-fill {
+  from { width: 0; }
+}
+
+.progress-fill {
+  animation: progress-fill 0.5s ease;
+}
+
+/* 卡片悬浮效果 */
+.card-hover:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.15);
+}
+
+/* 按钮点击反馈 */
+.btn-primary {
+  background: var(--primary);
+  color: white;
+  font-weight: 600;
+}
+
+.btn-primary:hover {
+  background: #4338CA;
+}
+
+.btn-primary:active {
+  transform: scale(0.98);
+}
+
+.btn-success {
+  background: var(--success);
+  color: white;
+  font-weight: 600;
+}
+
+.btn-success:hover {
+  background: #16A34A;
+}
+
+/* 统计数字强调 */
+.stat-number {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+/* 分类标签样式 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.tag-blue {
+  background: #EEF2FF;
+  color: #4F46E5;
+}
+
+.tag-green {
+  background: #DCFCE7;
+  color: #16A34A;
+}
+
+.tag-orange {
+  background: #FEF3C7;
+  color: #D97706;
+}
+
+.tag-red {
+  background: #FEE2E2;
+  color: #DC2626;
 }
