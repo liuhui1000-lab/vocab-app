@@ -110,6 +110,37 @@ export function VocabAppContent() {
   const unsavedCountRef = useRef(0);  // 添加 ref 追踪最新值
   const [spellResult, setSpellResult] = useState<{ correct: boolean; needMore?: number; completed?: boolean } | null>(null);
   const [newWordsInSession, setNewWordsInSession] = useState(0);  // 当前会话已分配的新词数量
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);  // 键盘是否可见
+
+  // 监听键盘弹出/收起事件
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleResize = () => {
+      const viewportHeight = window.visualViewport?.height || window.innerHeight;
+      const windowHeight = window.innerHeight;
+      // 当视口高度明显小于窗口高度时，说明键盘弹出了
+      const keyboardHeight = windowHeight - viewportHeight;
+      setIsKeyboardVisible(keyboardHeight > 150);  // 阈值150px
+    };
+    
+    // 使用 visualViewport API 监听视口变化
+    const viewport = window.visualViewport;
+    if (viewport) {
+      viewport.addEventListener('resize', handleResize);
+      handleResize();  // 初始化检测
+    }
+    
+    // 后备方案：监听 window resize
+    window.addEventListener('resize', handleResize);
+    
+    return () => {
+      if (viewport) {
+        viewport.removeEventListener('resize', handleResize);
+      }
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   // 同步 ref
   useEffect(() => {
@@ -1109,6 +1140,9 @@ export function VocabAppContent() {
   if (currentView === 'study' && currentWord) {
     const isSpellMode = mode === 'spell';
     
+    // 键盘弹出时调整按钮区域的 padding
+    const buttonPadding = isKeyboardVisible ? 'pb-safe' : 'pb-4';
+    
     return (
       <div className="h-[100dvh] bg-gray-50 flex flex-col overflow-hidden">
         {/* Header - 固定顶部 */}
@@ -1195,6 +1229,13 @@ export function VocabAppContent() {
                   }`}
                   autoFocus
                   disabled={spellResult?.correct !== undefined}
+                  onFocus={() => {
+                    // 键盘弹出时，等待一小会儿让键盘完全弹出，然后滚动到输入框
+                    setTimeout(() => {
+                      const input = document.getElementById('spell-input');
+                      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }, 100);
+                  }}
                   onKeyDown={async (e) => {
                     if (e.key === 'Enter' && !spellResult) {
                       const input = e.target as HTMLInputElement;
@@ -1261,7 +1302,7 @@ export function VocabAppContent() {
         </div>
 
         {/* Action button - 固定在底部，键盘弹出时会自动上移 */}
-        <div className="shrink-0 px-4 pb-4 pt-2 bg-gray-50">
+        <div className={`shrink-0 px-4 pt-2 bg-gray-50 ${isKeyboardVisible ? 'pb-[max(1.5rem,env(safe-area-inset-bottom))]' : 'pb-4'}`}>
           {mode === 'learn' && (
             <button
               onClick={handleLearnNext}
