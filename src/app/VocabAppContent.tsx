@@ -641,7 +641,7 @@ export function VocabAppContent() {
           
           setCurrentWord({ ...currentWord, tempStep: 2, inPenalty: false, penaltyProgress: 0 });
           setSpellResult({ correct: true, completed: true });
-          // 强制标记为从错题池答对，确保 interval 锁定为 1（明天复习）
+          // 刚完成惩罚模式：interval=1（明天正常复习），EF不变
           await updateWordState(currentWord, true, true);
           await recordStat(username, currentWord.semester_id, 'review');
           return { correct: true, completed: true, updatedSessionWords: updated };
@@ -716,7 +716,7 @@ export function VocabAppContent() {
     }
   };
 
-  const updateWordState = async (word: SessionWord, success: boolean, forceFromErrorPool: boolean = false) => {
+  const updateWordState = async (word: SessionWord, success: boolean, justFinishedPenalty: boolean = false) => {
     const currentEf = word.progress?.ef ?? 25;
     const currentInterval = word.progress?.interval ?? 0;
     const currentFailureCount = word.progress?.failure_count ?? 0;
@@ -724,20 +724,16 @@ export function VocabAppContent() {
     // 判断是否为新词（之前没有进度或状态为 new）
     const isNewWord = !word.progress || word.progress.state === 'new';
     
-    // 判断是否"从错题池答对"：
-    // 1. 有案底(failureCount>0)且正在惩罚中
-    // 2. 或者强制标记（用于惩罚模式完成后的锁定机制）
-    const isFromErrorPool = forceFromErrorPool || (currentFailureCount > 0 && word.inPenalty);
-    
     console.log('[updateWordState]', {
       wordId: word.id,
       word: word.word,
       success,
       isNewWord,
+      currentEf: currentEf / 10,
+      currentInterval,
       currentFailureCount,
       wordInPenalty: word.inPenalty,
-      forceFromErrorPool,
-      isFromErrorPool
+      justFinishedPenalty
     });
     
     const { ef, interval, nextReview } = calculateNextReview(
@@ -746,7 +742,7 @@ export function VocabAppContent() {
       currentInterval, 
       isNewWord,
       currentFailureCount,
-      isFromErrorPool  // 传递是否从错题池答对
+      justFinishedPenalty
     );
     
     // HTML: w.state = success ? 'review' : 'learning'

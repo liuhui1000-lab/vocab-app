@@ -37,65 +37,65 @@ export function getStudyDayString(): string {
   return formatDate(getStudyDayDate());
 }
 
-// Calculate next review time based on SM-2 algorithm with分层机制
-// 🟢 学霸词 (failureCount === 0): 正常SM-2，间隔 × 2.5
-// 🔴 康复词 (failureCount > 0): 双重验证机制
-//    - 答错后：interval = 1（明天复习）
-//    - 从错题池答对（isFromErrorPool=true）：interval 锁定为 1（明天再考一次）
-//    - 连续答对2次后：恢复正常乘法
-// 
-// 返回的 nextReview 是本地日期字符串 "YYYY-MM-DD"，与 isDueForReview 的比较逻辑一致
+// Calculate next review time based on SM-2 algorithm
+// EF（易遗忘因子）规则：
+//   - 初始值：2.5（内部存储为25，计算时除以10）
+//   - 答对：+0.1（内部+1），最高2.5
+//   - 答错：-0.2（内部-2），最低1.3
+//
+// 惩罚模式规则：
+//   - 当天答错 → 必须连续3次正确才能过
+//   - 惩罚模式通过后 → interval=1，第二天正常复习
+//
+// 正常复习规则：
+//   - 一遍过 → EF+0.1，interval = 当前interval × 当前EF
+//   - 答错 → EF-0.2，进入当天的惩罚模式，interval=1
 export function calculateNextReview(
   success: boolean,
-  currentEf: number,
+  currentEf: number,      // 内部存储值，25表示2.5
   currentInterval: number,
   isNewWord: boolean = false,
   failureCount: number = 0,
-  isFromErrorPool: boolean = false
+  justFinishedPenalty: boolean = false  // 刚完成惩罚模式
 ): { ef: number; interval: number; nextReview: string } {
   let ef = currentEf;
   let interval = currentInterval;
   
-  // 🟢 学霸词：无案底，正常SM-2
-  const isTopStudent = failureCount === 0;
-  
   if (success) {
     if (isNewWord) {
-      // 新词第一次答对：直接跳到 3天后（学霸快车道）
+      // 新词第一次答对：interval=3，EF+0.1
       interval = 3;
-    } else if (isFromErrorPool && !isTopStudent) {
-      // 🔴 康复词从错题池答对：interval 锁定为 1（明天再考一次！）
-      // 系统潜台词："我不信你真记住了，明天再考你一次！"
+      ef = Math.min(25, ef + 1);
+    } else if (justFinishedPenalty) {
+      // 刚完成惩罚模式：interval=1（明天正常复习），EF不变
+      // 注意：EF的变化已经在第一次答错时处理了
       interval = 1;
     } else {
-      // 正常复习词答对：间隔 × EF（2.5倍）
+      // 正常复习答对：interval × EF，EF+0.1
       interval = Math.ceil(interval * (ef / 10));
+      ef = Math.min(25, ef + 1);
     }
-    // 增加 EF（最高 2.5）
-    ef = Math.min(25, ef + 1);
   } else {
-    // 🔴 答错：EF 降低（最低 1.3），interval 强制为 1（明天重背）
-    // 同时标记为有案底，进入康复词池
+    // 答错：EF-0.2，interval=1（明天复习）
     ef = Math.max(13, ef - 2);
-    interval = 1;  // 强制明天复习
+    interval = 1;
   }
   
-  // 使用学习日基准时间，计算下次复习日期
+  // 计算下次复习日期
   const baseDate = getStudyDayDate();
   const nextReviewDate = new Date(baseDate);
   nextReviewDate.setDate(nextReviewDate.getDate() + interval);
-  
-  // 返回日期字符串 "YYYY-MM-DD"
   const nextReview = formatDate(nextReviewDate);
   
   console.log('[calculateNextReview]', {
     success,
     isNewWord,
     failureCount,
-    isFromErrorPool,
-    isTopStudent,
-    calculatedInterval: interval,
-    baseDate: formatDate(baseDate),
+    justFinishedPenalty,
+    currentEf: currentEf / 10,
+    newEf: ef / 10,
+    currentInterval,
+    newInterval: interval,
     nextReview
   });
   
