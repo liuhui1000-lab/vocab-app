@@ -641,7 +641,8 @@ export function VocabAppContent() {
           
           setCurrentWord({ ...currentWord, tempStep: 2, inPenalty: false, penaltyProgress: 0 });
           setSpellResult({ correct: true, completed: true });
-          await updateWordState(currentWord, true);
+          // 强制标记为从错题池答对，确保 interval 锁定为 1（明天复习）
+          await updateWordState(currentWord, true, true);
           await recordStat(username, currentWord.semester_id, 'review');
           return { correct: true, completed: true, updatedSessionWords: updated };
         } else {
@@ -715,7 +716,7 @@ export function VocabAppContent() {
     }
   };
 
-  const updateWordState = async (word: SessionWord, success: boolean) => {
+  const updateWordState = async (word: SessionWord, success: boolean, forceFromErrorPool: boolean = false) => {
     const currentEf = word.progress?.ef ?? 25;
     const currentInterval = word.progress?.interval ?? 0;
     const currentFailureCount = word.progress?.failure_count ?? 0;
@@ -723,9 +724,21 @@ export function VocabAppContent() {
     // 判断是否为新词（之前没有进度或状态为 new）
     const isNewWord = !word.progress || word.progress.state === 'new';
     
-    // 判断是否"从错题池答对"：有案底(failureCount>0)且正在惩罚中
-    // 这是康复词的"双重验证"机制关键判断
-    const isFromErrorPool = currentFailureCount > 0 && word.inPenalty;
+    // 判断是否"从错题池答对"：
+    // 1. 有案底(failureCount>0)且正在惩罚中
+    // 2. 或者强制标记（用于惩罚模式完成后的锁定机制）
+    const isFromErrorPool = forceFromErrorPool || (currentFailureCount > 0 && word.inPenalty);
+    
+    console.log('[updateWordState]', {
+      wordId: word.id,
+      word: word.word,
+      success,
+      isNewWord,
+      currentFailureCount,
+      wordInPenalty: word.inPenalty,
+      forceFromErrorPool,
+      isFromErrorPool
+    });
     
     const { ef, interval, nextReview } = calculateNextReview(
       success, 
@@ -823,7 +836,7 @@ export function VocabAppContent() {
         interval: w.progress!.interval ?? 0,
         failureCount: w.progress!.failure_count ?? 0,
         penaltyProgress: 0,
-        inPenalty: false,
+        inPenalty: w.progress!.in_penalty ?? false,  // 保留惩罚状态
       }));
     
     console.log('[finishSession] progressToSave:', progressToSave);

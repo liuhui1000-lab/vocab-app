@@ -13,11 +13,24 @@ export function getStudyDayDate(): Date {
 
 // 判断给定日期是否在当前学习日或之前（用于待复习判断）
 export function isDueForReview(reviewDateStr: string): boolean {
+  // 解析复习日期，只取日期部分
   const reviewDate = new Date(reviewDateStr);
+  const reviewDateOnly = new Date(
+    reviewDate.getFullYear(),
+    reviewDate.getMonth(),
+    reviewDate.getDate()
+  );
+  
+  // 获取当前学习日
   const studyDay = getStudyDayDate();
-  // 设置到当天的23:59:59，确保当天任何时间都算"已到复习时间"
-  studyDay.setHours(23, 59, 59, 999);
-  return reviewDate <= studyDay;
+  const studyDayOnly = new Date(
+    studyDay.getFullYear(),
+    studyDay.getMonth(),
+    studyDay.getDate()
+  );
+  
+  // 比较日期（忽略时间）
+  return reviewDateOnly <= studyDayOnly;
 }
 
 // Format date to YYYY-MM-DD（基于学习日）
@@ -65,15 +78,30 @@ export function calculateNextReview(
     // 增加 EF（最高 2.5）
     ef = Math.min(25, ef + 1);
   } else {
-    // 🔴 答错：EF 降低（最低 1.3），interval 清零为 1（明天重背）
+    // 🔴 答错：EF 降低（最低 1.3），interval 强制为 1（明天重背）
     // 同时标记为有案底，进入康复词池
     ef = Math.max(13, ef - 2);
-    interval = 1;
+    interval = 1;  // 强制明天复习
   }
   
   // 使用学习日基准时间，规范化为当天 00:00:00
-  const nextReview = getStudyDayDate();
-  nextReview.setDate(nextReview.getDate() + interval);
+  const baseDate = getStudyDayDate();
+  const nextReview = new Date(
+    baseDate.getFullYear(),
+    baseDate.getMonth(),
+    baseDate.getDate() + interval,
+    0, 0, 0, 0  // 清除时间部分
+  );
+  
+  console.log('[calculateNextReview]', {
+    success,
+    isNewWord,
+    failureCount,
+    isFromErrorPool,
+    isTopStudent,
+    calculatedInterval: interval,
+    nextReview: nextReview.toISOString()
+  });
   
   return { ef, interval, nextReview };
 }
